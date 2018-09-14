@@ -12,7 +12,10 @@ class MapCloudGenerate
 {
 public:
   using Ptr=std::shared_ptr<MapCloudGenerate>;
-  MapCloudGenerate(){}
+  MapCloudGenerate()
+  {
+    _downSizeFilter.setLeafSize(0.2,0.2,0.2);
+  }
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr generate(std::vector<KeyFrameSnapshot::Ptr> keyframes,double resolution)
   {
@@ -32,11 +35,10 @@ public:
     cloud->width=cloud->size();
     cloud->height=1;
     cloud->is_dense=false;
-    pcl::VoxelGrid<pcl::PointXYZI> downSizeFilter;
     pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
-    downSizeFilter.setLeafSize(0.2,0.2,0.2);
-    downSizeFilter.setInputCloud(cloud);
-    downSizeFilter.filter(*filtered);
+    filtered->reserve(cloud->size());
+    _downSizeFilter.setInputCloud(cloud);
+    _downSizeFilter.filter(*filtered);
    /* pcl::octree::OctreePointCloud<pcl::PointXYZI> octree(resolution);
     octree.setInputCloud(cloud);
     octree.addPointsFromInputCloud();
@@ -50,6 +52,8 @@ public:
 
     return filtered;
   }
+private:
+  pcl::VoxelGrid<pcl::PointXYZI> _downSizeFilter;
 };
 }
 #endif // MAP_CLOUD_GENERATOR_H
