@@ -10,7 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   tf
-  ndt_omp)
+  ndt_omp
+  rviz)
 add_definitions(-std=c++11 -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2)
 set(CMAKE_CXX_FLAGS "-std=c++11 -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
@@ -25,6 +26,13 @@ add_definitions(${PCL_DEFINITIONS})
 find_package(G2O REQUIRED)
 include_directories(SYSTEM ${G2O_INCLUDE_DIR} ${G2O_INCLUDE_DIRS})
 link_directories(${G2O_LIBRARY_DIRS})
+
+find_package(Qt5 REQUIRED Core Widgets)#added
+set(QT_LIBRARIES Qt5::Widgets)#added
+
+## I prefer the Qt signals and slots to avoid defining "emit", "slots",
+## etc because they can conflict with boost signals, so define QT_NO_KEYWORDS here.
+add_definitions(-DQT_NO_KEYWORDS)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -46,6 +54,7 @@ add_message_files(
 add_service_files(
   FILES
   SaveMap.srv
+  GlobalMap.srv
 )
 generate_messages(
  DEPENDENCIES

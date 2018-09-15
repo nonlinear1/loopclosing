@@ -15,6 +15,7 @@ public:
   MapCloudGenerate()
   {
     _downSizeFilter.setLeafSize(0.2,0.2,0.2);
+    _display_distance_threash=100;
   }
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr generate(std::vector<KeyFrameSnapshot::Ptr> keyframes,double resolution)
@@ -54,6 +55,7 @@ public:
   }
 private:
   pcl::VoxelGrid<pcl::PointXYZI> _downSizeFilter;
+  double _display_distance_threash;
 };
 }
 #endif // MAP_CLOUD_GENERATOR_H
