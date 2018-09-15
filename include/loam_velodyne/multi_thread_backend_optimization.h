@@ -16,6 +16,7 @@
 #include"loop_detector.hpp"
 #include"loam_velodyne/map_cloud_generator.h"
 #include"loam_velodyne/SaveMap.h"
+#include"loam_velodyne/GlobalMap.h"
 #include<visualization_msgs/MarkerArray.h>
 namespace loam {
 class BackendOptimization
@@ -39,6 +40,7 @@ public:
   void graph_optimization_timer_callback(const ros::TimerEvent& event);
   void pub_map_pointcloud_timer_callback(const ros::TimerEvent& event);
   bool save_map_cllback(loam_velodyne::SaveMapRequest& req,loam_velodyne::SaveMapResponse& res);
+  bool mapvis_info_cllback(loam_velodyne::GlobalMapRequest& req,loam_velodyne::GlobalMapResponse& res);
   visualization_msgs::MarkerArray creat_trajectory(const ros::Time& stamp);
   //keyframe variable
   std::vector<std::shared_ptr<KeyFrame>> _keyFrames;
@@ -84,6 +86,9 @@ public:
   std::unique_ptr<MapCloudGenerate> _map_generate;
   ros::Publisher _pub_map_point;
   ros::ServiceServer _map_save_server;
+  ros::ServiceServer _map_info_server;
+  double _display_distance_threash;
+  bool _is_global_map;
   //visual maker
   ros::Publisher _vis_pub;
   ros::Publisher _vis_odom_pub;

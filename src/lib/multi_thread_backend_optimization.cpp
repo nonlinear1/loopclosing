@@ -9,16 +9,18 @@
 #include<g2o/types/slam3d/edge_se3.h>
 #include <g2o/types/slam3d/vertex_se3.h>
 #include <g2o/edge_se3_plane.hpp>
+#include<boost/filesystem.hpp>
 namespace loam {
 BackendOptimization::BackendOptimization():
   _max_keyframes_per_update(10),
   _floor_edge_stddev(10.0),
   _graph_optimization_time_duration(3.0),
   _pub_map_pointcloud_time_duration(10.0),
-  _accumulate_distance(0),
-  _map_generate(new MapCloudGenerate())
+  _accumulate_distance(0)
 {
    _trans_odom2map=Eigen::Isometry3d::Identity();
+    _display_distance_threash=100;
+   _is_global_map=false;
 }
 bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
 {
@@ -31,7 +33,7 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
   _info_calculator.reset(new InformationMatrixCalculator(nh));
   _loop_detector.reset(new LoopDetector(nh));
   graph_slam.reset(new GraphSLAM());
-
+   _map_generate.reset(new MapCloudGenerate());
   _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_submap_cloud",2));
   _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/submap_odometry",2));
   _sub_submap_vecodom.reset(new message_filters::Subscriber<loam_velodyne::VectorOdometry>(nh,"/submap_vecOdom",2));
@@ -47,6 +49,7 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
   _pub_map_point=nh.advertise<sensor_msgs::PointCloud2>("/map_points",1);
 
   _map_save_server=nh.advertiseService("/save_map",&BackendOptimization::save_map_cllback,this);
+  _map_info_server=nh.advertiseService("/setup_map",&BackendOptimization::mapvis_info_cllback,this);
   _vis_pub=nh.advertise<visualization_msgs::MarkerArray>("/markers",2);
   _vis_odom_pub=nh.advertise<visualization_msgs::Marker>("/odom_marker",2);
 }
@@ -231,7 +234,7 @@ void BackendOptimization::pub_map_pointcloud_timer_callback(const ros::TimerEven
   _snapshot_cloud_mutex.unlock();
 
   ros::Time start=ros::Time::now();
-  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud=_map_generate->generate(snapshot,0.05);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud=_map_generate->generate(snapshot,0.05,_display_distance_threash,_is_global_map);
   if(!cloud)
   {
     std::cout<<"cloud is empty"<<std::endl;
@@ -246,20 +249,41 @@ void BackendOptimization::pub_map_pointcloud_timer_callback(const ros::TimerEven
 }
 bool BackendOptimization::save_map_cllback(loam_velodyne::SaveMapRequest& req,loam_velodyne::SaveMapResponse& res)
 {
+  std::cout<<"fffffffff"<<std::endl;
   std::vector<KeyFrameSnapshot::Ptr> snapshot;
   _snapshot_cloud_mutex.lock();
   snapshot=_snapshot_cloud;
   _snapshot_cloud_mutex.unlock();
-  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud=_map_generate->generate(snapshot,req.resolution);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud=_map_generate->generate(snapshot,req.resolution,_display_distance_threash,true);
   if(!cloud)
   {
     res.success=false;
     return true;
   }
+  size_t position=req.destination.find_last_of("/");
+  std::string path_dir(req.destination.substr(0,position));
+  //std::cout<<"save path:"<<path_dir<<std::endl;
+  boost::filesystem::path save_path(path_dir.c_str());
+  if(!boost::filesystem::exists(save_path))
+  {
+    boost::filesystem::create_directory(save_path);
+  }
+  //std::cout<<"destion"<<req.destination<<std::endl;
+
   bool ret=pcl::io::savePCDFileBinary(req.destination,*cloud);
   res.success=(ret==0);
   return true;
 }
+bool BackendOptimization::mapvis_info_cllback(loam_velodyne::GlobalMapRequest& req,loam_velodyne::GlobalMapResponse& res)
+{
+  _display_distance_threash=req.distance;
+  _is_global_map=req.isDisGlobalMap;
+  std::cout<<"_display_distance_threash:"<<_display_distance_threash<<"global"<<_is_global_map<<std::endl;
+  res.success=true;
+  return true;
+
+}
+
 visualization_msgs::MarkerArray BackendOptimization::creat_trajectory(const ros::Time& stamp)
 {
   visualization_msgs::MarkerArray maker_array;

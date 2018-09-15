@@ -29,9 +29,6 @@ link_directories(${G2O_LIBRARY_DIRS})
 
 find_package(Qt5 REQUIRED Core Widgets)#added
 set(QT_LIBRARIES Qt5::Widgets)#added
-
-## I prefer the Qt signals and slots to avoid defining "emit", "slots",
-## etc because they can conflict with boost signals, so define QT_NO_KEYWORDS here.
 add_definitions(-DQT_NO_KEYWORDS)
 
 find_package(OpenMP)
@@ -45,6 +42,7 @@ include_directories(
 	${catkin_INCLUDE_DIRS} 
         #${EIGEN3_INCLUDE_DIR}
         ${PCL_INCLUDE_DIRS})
+
 add_message_files(
   FILES
   VectorOdometry.msg
@@ -66,10 +64,19 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES loam
 )
-
+qt5_wrap_cpp(MOC_FILES
+  include/rviz_plugion/mapinfoupdatesrv.h
+)
 #add_definitions( -march=native )
+add_library(mapinfo
+            src/rviz_plugion/mapinfoupdatesrv.cpp
+            ${MOC_FILES})
+target_link_libraries(mapinfo
+    ${catkin_LIBRARIES}
+    ${QT_LIBRARIES})
 
 add_subdirectory(src/lib)
+
 
 add_executable(multiScanRegistration src/multi_scan_registration_node.cpp)
 target_link_libraries(multiScanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )

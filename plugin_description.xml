@@ -1,0 +1,9 @@
+<library path="lib/libmapinfo">
+  <class name="mapinfo/MapInfoUpdateSrv"
+         type="mapinfo::MapInfoUpdateSrv"
+         base_class_type="rviz::Panel">
+    <description>
+      A panel widget set up map parameter.
+    </description>
+  </class>
+</library>

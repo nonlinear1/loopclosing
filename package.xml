@@ -43,5 +43,6 @@
   <test_depend>rosbag</test_depend>
 
   <export>
+     <rviz plugin="${prefix}/plugin_description.xml"/>
   </export>
 </package>
