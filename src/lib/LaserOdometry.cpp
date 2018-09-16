@@ -461,7 +461,7 @@ void LaserOdometry::imuTransHandler(const sensor_msgs::PointCloud2ConstPtr& imuT
 
 void LaserOdometry::spin()
 {
-  ros::Rate rate(100);
+  ros::Rate rate(1000);
   bool status = ros::ok();
 
   // loop until shutdown
