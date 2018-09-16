@@ -20,6 +20,7 @@ BackendOptimization::BackendOptimization():
 {
    _trans_odom2map=Eigen::Isometry3d::Identity();
     _display_distance_threash=100;
+    _display_resolution=0.4;
    _is_global_map=false;
 }
 bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
@@ -234,7 +235,7 @@ void BackendOptimization::pub_map_pointcloud_timer_callback(const ros::TimerEven
   _snapshot_cloud_mutex.unlock();
 
   ros::Time start=ros::Time::now();
-  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud=_map_generate->generate(snapshot,0.05,_display_distance_threash,_is_global_map);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud=_map_generate->generate(snapshot,_display_resolution,_display_distance_threash,_is_global_map);
   if(!cloud)
   {
     std::cout<<"cloud is empty"<<std::endl;
@@ -278,7 +279,9 @@ bool BackendOptimization::mapvis_info_cllback(loam_velodyne::GlobalMapRequest& r
 {
   _display_distance_threash=req.distance;
   _is_global_map=req.isDisGlobalMap;
-  std::cout<<"_display_distance_threash:"<<_display_distance_threash<<"global"<<_is_global_map<<std::endl;
+  _display_resolution=req.resolution;
+  std::cout<<"_display_distance_threash:"<<_display_distance_threash<<"global"<<_is_global_map
+          <<"_display_resolution"<<_display_resolution<<std::endl;
   res.success=true;
   return true;
 

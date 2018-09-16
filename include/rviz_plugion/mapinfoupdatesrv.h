@@ -28,6 +28,7 @@ protected:
   ros::ServiceClient _save_map;
 
   QLineEdit* _line_edit;
+  QLineEdit* _dis_resolution;
   QCheckBox* _check_box;
   QLineEdit* _line_resolution;
   QLineEdit* _line_destination;

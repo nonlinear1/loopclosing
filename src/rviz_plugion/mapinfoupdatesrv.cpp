@@ -16,13 +16,22 @@ MapInfoUpdateSrv::MapInfoUpdateSrv(QWidget* parent):
   _check_box->setChecked(false);
   vertical_layout->addWidget(_check_box);
 
-  _line_edit=new QLineEdit("distance thresh");
+  _line_edit=new QLineEdit();
   QDoubleValidator *pDfValidator = new QDoubleValidator(0.0, 100.0 , 2, _line_edit);
   pDfValidator->setNotation(QDoubleValidator::StandardNotation);
   _line_edit->setValidator(pDfValidator);
   _line_edit->setText(QString("%1").arg(100.00));
   vertical_layout->addWidget(new QLabel("distance thresh"));
   vertical_layout->addWidget(_line_edit);
+
+  _dis_resolution=new QLineEdit();
+  QDoubleValidator *disfValidator = new QDoubleValidator(0.0, 100.0 , 2, _dis_resolution);
+  disfValidator->setNotation(QDoubleValidator::StandardNotation);
+  _dis_resolution->setValidator(disfValidator);
+  _dis_resolution->setText(QString("%1").arg(0.4));
+  vertical_layout->addWidget(new QLabel("display resolution"));
+  vertical_layout->addWidget(_dis_resolution);
+
 
   _send_distance=new QPushButton("sendDis");
   vertical_layout->addWidget(_send_distance);
@@ -58,9 +67,13 @@ void MapInfoUpdateSrv::update_distance_thresh()
 {
   loam_velodyne::GlobalMap global_map;
   float distance=100;
+  float resolution=0.4;
   if(!_line_edit->text().isEmpty())
        distance=_line_edit->text().toFloat();
+  if(!_dis_resolution->text().isEmpty())
+       resolution=_dis_resolution->text().toFloat();
   global_map.request.distance=distance;
+  global_map.request.resolution=resolution;
   if(_check_box->isChecked())
      global_map.request.isDisGlobalMap=true;
   else

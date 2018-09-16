@@ -1,5 +1,5 @@
 bool isDisGlobalMap
 float32 distance
-float resolution
+float32 resolution
 ---
 bool success

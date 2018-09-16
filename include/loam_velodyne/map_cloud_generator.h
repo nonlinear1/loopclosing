@@ -18,6 +18,7 @@ public:
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr generate(std::vector<KeyFrameSnapshot::Ptr> keyframes,double resolution,double distance,bool global)
   {
+    _downSizeFilter.setLeafSize(resolution,resolution,resolution);
     if(keyframes.empty()) return nullptr;
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
     cloud->reserve(keyframes.front()->_cloud->size()*keyframes.size());

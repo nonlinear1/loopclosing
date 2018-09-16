@@ -89,6 +89,7 @@ public:
   ros::ServiceServer _map_info_server;
   double _display_distance_threash;
   bool _is_global_map;
+  double _display_resolution;
   //visual maker
   ros::Publisher _vis_pub;
   ros::Publisher _vis_odom_pub;
