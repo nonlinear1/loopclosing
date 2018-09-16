@@ -175,7 +175,7 @@ bool LaserOdometry::setup(ros::NodeHandle &node,
 //R_is^-1=s*R_es^-1=s*R_y^-1*R_x^-1*R_z^-1
 //t_is=s*t_es
 
-void LaserOdometry::EtransformToStart(const pcl::PointXYZI pi, pcl::PointXYZI po)
+/*void LaserOdometry::EtransformToStart(const pcl::PointXYZI pi, pcl::PointXYZI po)
 {
   float rx = _transform.rot_x.rad();
   float ry = _transform.rot_y.rad();
@@ -221,7 +221,7 @@ void LaserOdometry::EtransformToStart(const pcl::PointXYZI pi, pcl::PointXYZI po
     Eigen::Vector3d po_pos1=T1*x_pi_pos;
     std::cout<<"eigen pos"<<po_pos1<<std::endl;
 }
-
+*/
 void LaserOdometry::transformToStart(const pcl::PointXYZI& pi, pcl::PointXYZI& po)
 {
   //LaserOdometry::EtransformToStart(pi,po);
@@ -470,7 +470,7 @@ void LaserOdometry::spin()
 
     // try processing new data
     process();
-
+    //std::cout<<"laser odome spin"<<std::endl;
     status = ros::ok();
     rate.sleep();
   }
@@ -961,7 +961,7 @@ void LaserOdometry::process()
   publishResult();
 }
 
-void LaserOdometry::EtestWE()
+/*void LaserOdometry::EtestWE()
 {
   //计算T_sw
   double ws_rx=_transformSum.rot_x.rad();
@@ -1003,18 +1003,18 @@ void LaserOdometry::EtestWE()
   T_es.rotate(es_rotation_matrix);
   T_es.pretranslate(Eigen::Vector3d(es_px,es_py,es_pz));
 
-  Eigen::Matrix3d he_rotate=ws_rotation_matrix*es_rotation_matrix;
-  Eigen::Vector3d rot_angles=he_rotate.eulerAngles(1,0,2);
-  Eigen::Isometry3d T_we=T_sw*T_es.inverse();//T_we
+//  Eigen::Matrix3d he_rotate=ws_rotation_matrix*es_rotation_matrix;
+ // Eigen::Vector3d rot_angles=he_rotate.eulerAngles(1,0,2);
+ // Eigen::Isometry3d T_we=T_sw*T_es.inverse();//T_we
 
-  Eigen::Vector3d angles=T_we.rotation().eulerAngles(1,0,2);
-  Eigen::Vector3d translate=T_we.translation();
+ // Eigen::Vector3d angles=T_we.rotation().eulerAngles(1,0,2);
+//  Eigen::Vector3d translate=T_we.translation();
 
-  std::cout<<"angles"<<he_rotate<<std::endl;
-  std::cout<<"translate"<<translate<<std::endl;
+  //std::cout<<"angles"<<he_rotate<<std::endl;
+  //std::cout<<"translate"<<translate<<std::endl;
 }
-
-void quaternionAngle(Twist transformSum)
+*/
+/*void quaternionAngle(Twist transformSum)
 {
     Eigen::AngleAxisd ws_angle_x(transformSum.rot_x.rad(),Eigen::Vector3d::UnitX());
     Eigen::AngleAxisd ws_angle_y(transformSum.rot_y.rad(),Eigen::Vector3d::UnitY());
@@ -1026,9 +1026,10 @@ void quaternionAngle(Twist transformSum)
     Eigen::Quaterniond qut(ws_rotation_matrix);
     std::cout<<"ws_quaternion"<<qut.coeffs()<<std::endl;
 }
-
+*/
 void LaserOdometry::publishResult()
 {
+  //std::cout<<"laser odome publish"<<std::endl;
   // publish odometry tranformations
   geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw(_transformSum.rot_z.rad(),
                                                                               -_transformSum.rot_x.rad(),

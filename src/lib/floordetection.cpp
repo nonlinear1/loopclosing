@@ -61,10 +61,10 @@ void FloorDetection::cloud_callback(const sensor_msgs::PointCloud2ConstPtr& lase
   _laser_cloud_stamp=laserCloudSurfMsg->header.stamp;
   _laser_surf_cloud->clear();
   pcl::fromROSMsg(*laserCloudSurfMsg,*_laser_surf_cloud);
-  ros::Time start=ros::Time::now();
+  //ros::Time start=ros::Time::now();
   boost::optional<Eigen::Vector4f> floor=detect(_laser_surf_cloud);
   publishResult(floor);
-  std::cout<<"floor time:"<<(ros::Time::now()-start).toSec()*1000<<"ms"<<std::endl;
+  //std::cout<<"floor time:"<<(ros::Time::now()-start).toSec()*1000<<"ms"<<std::endl;
 }
 boost::optional<Eigen::Vector4f> FloorDetection::detect(const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud)
 {

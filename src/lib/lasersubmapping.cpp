@@ -450,6 +450,7 @@ void LaserSubMapping::laserBindCloudOdometryHandler(const sensor_msgs::PointClou
     _transformSum.pos.z() = float(odometry->pose.pose.position.z);
 
     _newLaserOdometry = true;
+    std::cout<<"laser submapping callback"<<std::endl;
    // std::cout<<cornerTimeStamp.toSec()<<" "<<surfTimeStamp.toSec()<<" "<<fullResTimeStamp.toSec()<<" "
      //       <<" "<<odometryTimeStamp.toSec()<<std::endl;
 
@@ -562,7 +563,7 @@ void LaserSubMapping::process()
     // waiting for new data to arrive...
     return;
   }
-
+  //std::cout<<"laser submapping process"<<std::endl;
   // reset flags, etc.
   reset();
 
@@ -1217,7 +1218,7 @@ void LaserSubMapping::publishResult()
 //  submapKeyPtr->_cloud->height=1;
 //  submapKeyPtr->_cloud->width=submapKeyPtr->_cloud->size();
 //  submapKeyPtr->_cloud->is_dense=false;
-  std::cout<<"submap cloud size:"<<submapKeyPtr->_flat_cloud->size()<<std::endl;
+ // std::cout<<"submap cloud size:"<<submapKeyPtr->_flat_cloud->size()<<std::endl;
   publishCloudMsg(_pubLaserSubMapCloudSurrund, *(submapKeyPtr->_cloud), submapKeyPtr->_stamp, "/camera_init");
   publishCloudMsg(_pubLaser_SubMap_FlatCloud_Surrund,*(submapKeyPtr->_flat_cloud),submapKeyPtr->_stamp, "/camera_init");
   _pubSubMapOdometry.publish(submapKeyPtr->pose);

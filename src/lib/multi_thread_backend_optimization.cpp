@@ -250,7 +250,7 @@ void BackendOptimization::pub_map_pointcloud_timer_callback(const ros::TimerEven
 }
 bool BackendOptimization::save_map_cllback(loam_velodyne::SaveMapRequest& req,loam_velodyne::SaveMapResponse& res)
 {
-  std::cout<<"fffffffff"<<std::endl;
+ // std::cout<<"fffffffff"<<std::endl;
   std::vector<KeyFrameSnapshot::Ptr> snapshot;
   _snapshot_cloud_mutex.lock();
   snapshot=_snapshot_cloud;
