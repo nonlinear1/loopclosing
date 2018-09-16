@@ -284,7 +284,6 @@ bool BackendOptimization::mapvis_info_cllback(loam_velodyne::GlobalMapRequest& r
           <<"_display_resolution"<<_display_resolution<<std::endl;
   res.success=true;
   return true;
-
 }
 
 visualization_msgs::MarkerArray BackendOptimization::creat_trajectory(const ros::Time& stamp)
