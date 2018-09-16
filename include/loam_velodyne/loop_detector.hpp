@@ -126,7 +126,7 @@ private:
     std::cout << "num_candidates: " << candidate_keyframes.size() << std::endl;
     std::cout << "matching" << std::flush;
     auto t1 = ros::Time::now();
-
+    registration->setMaximumIterations(10);
     pcl::PointCloud<PointT>::Ptr aligned(new pcl::PointCloud<PointT>());
     for(const auto& candidate : candidate_keyframes) {
       ros::Time clo_start=ros::Time::now();
@@ -140,7 +140,7 @@ private:
       if(!registration->hasConverged() || score > best_score) {
         continue;
       }
-
+      std::cout<<"score"<<(ros::Time::now()-clo_start).toSec()*1000<<"ms"<<std::endl;
       best_score = score;
       best_matched = candidate;
       relative_pose = registration->getFinalTransformation().cast<double>();
