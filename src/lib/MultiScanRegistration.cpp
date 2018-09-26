@@ -148,7 +148,8 @@ void MultiScanRegistration::handleCloudMessage(const sensor_msgs::PointCloud2Con
   // fetch new input cloud
   pcl::PointCloud<pcl::PointXYZI> laserCloudIn;
   pcl::fromROSMsg(*laserCloudMsg, laserCloudIn);
-
+  std::cout<<std::fixed;
+  std::cout<<"pointcloud timestamp is:"<<laserCloudMsg->header.stamp.toSec()<<std::endl;
   process(laserCloudIn, laserCloudMsg->header.stamp);
 }
 

@@ -450,7 +450,7 @@ void LaserSubMapping::laserBindCloudOdometryHandler(const sensor_msgs::PointClou
     _transformSum.pos.z() = float(odometry->pose.pose.position.z);
 
     _newLaserOdometry = true;
-    std::cout<<"laser submapping callback"<<std::endl;
+    //std::cout<<"laser submapping callback"<<std::endl;
    // std::cout<<cornerTimeStamp.toSec()<<" "<<surfTimeStamp.toSec()<<" "<<fullResTimeStamp.toSec()<<" "
      //       <<" "<<odometryTimeStamp.toSec()<<std::endl;
 
