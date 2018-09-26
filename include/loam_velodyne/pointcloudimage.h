@@ -22,9 +22,10 @@ public:
   Eigen::Vector3d _t;
   ros::Time _stamp;
 };
+template<class PointT>
 struct PCloudPose
 {
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr _cloud;
+  pcl::PointCloud<PointT>::Ptr _cloud;
   Eigen::Quaterniond _r;
   Eigen::Vector3d _t;
   ros::Time _stamp;
@@ -46,7 +47,8 @@ public:
   Eigen::Isometry3d _relative_pose;
   int _height,_width;
   std::unique_ptr<CircularBuffer<Image>> _images_bufffer;
-  std::vector<PCloudPose> _vec_pointcloud;
+  std::vector<PCloudPose<pcl::PointXYZI>> _vec_pointcloud;
+  std::vector<PCloudPose<pcl::PointXYZRGB>> _vecp_pub_pointcloud;
   std::vector<Image> _vec_pose_image;
   ros::Publisher _pub_pointscloud;
   ros::Publisher _pub_odom;
