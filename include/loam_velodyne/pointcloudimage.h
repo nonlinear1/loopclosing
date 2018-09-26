@@ -29,6 +29,7 @@ struct PCloudPose
   Eigen::Quaterniond _r;
   Eigen::Vector3d _t;
   ros::Time _stamp;
+  bool _is_rgb=false;
 };
 class PointCloudImage
 {
@@ -36,20 +37,20 @@ public:
   PointCloudImage();
   void readConfig(const std::string& path);
   cv::Vec3b interpolate(double x,double y,const cv::Mat img);
-  void projected();
+  void projected(int index);
   bool setup(ros::NodeHandle& nh,ros::NodeHandle& private_nh);
   void imageCallback(const sensor_msgs::ImageConstPtr& img);
   void pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& pointscloud,const nav_msgs::OdometryConstPtr& odom);
   void publishResult();
-  void calImagePose();
+  void calImagePose(int index);
 public:
   Eigen::Matrix<double,3,4> _projected;
   Eigen::Isometry3d _relative_pose;
   int _height,_width;
-  std::unique_ptr<CircularBuffer<Image>> _images_bufffer;
-  std::vector<PCloudPose<pcl::PointXYZI>> _vec_pointcloud;
-  std::vector<PCloudPose<pcl::PointXYZRGB>> _vecp_pub_pointcloud;
-  std::vector<Image> _vec_pose_image;
+  std::vector<std::unique_ptr<CircularBuffer<Image>>> _images_bufffer;
+  std::vector<PCloudPose<pcl::PointXYZRGBA>> _vec_pointcloud;
+  std::vector<std::vector<Image>> _vec_pose_image;
+  int _camera_number;
   ros::Publisher _pub_pointscloud;
   ros::Publisher _pub_odom;
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_pointscloud;
