@@ -10,7 +10,8 @@ add_library(loam
             graph_slam.cpp
             registrations.cpp
             multi_thread_backend_optimization.cpp
-            windowoptim.cpp)
+            windowoptim.cpp
+            pointcloudimage.cpp)
 target_link_libraries(loam
     ${catkin_LIBRARIES}
     ${PCL_LIBRARIES}
@@ -20,4 +21,5 @@ target_link_libraries(loam
     ${G2O_SOLVER_PCG}
     ${G2O_SOLVER_CSPARSE}
     ${G2O_TYPES_SLAM3D}
-    ${G2O_TYPES_SLAM3D_ADDONS})
+    ${G2O_TYPES_SLAM3D_ADDONS}
+    ${OpenCV_LIBRARIES})

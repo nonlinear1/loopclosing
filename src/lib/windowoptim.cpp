@@ -69,7 +69,7 @@ WindowOptim::WindowOptim(const float& scanPeriod,
         _keyframeDeltaTrans(1),
         _keyframeDeltaAngle(1),
         _keyframeDeltaTime(1),
-        _submap_size(30),
+        _submap_size(12),
         _laserCloudNum(_laserCloudWidth * _laserCloudHeight * _laserCloudDepth),
         _laserCloudCornerLast(new pcl::PointCloud<pcl::PointXYZI>()),
         _laserCloudSurfLast(new pcl::PointCloud<pcl::PointXYZI>()),
@@ -537,10 +537,8 @@ void WindowOptim::spin()
     ros::spinOnce();
 
     // try processing buffered data
-    //clock_t begin = clock();
+
     process();
-    //clock_t end = clock();
-    //std::cout<<"map Running time: "<<(double)(end-begin)/CLOCKS_PER_SEC*1000<<"ms"<<std::endl;
     status = ros::ok();
     rate.sleep();
   }
@@ -578,8 +576,6 @@ void WindowOptim::process()
   // reset flags, etc.
   reset();
 
-   clock_t begin = clock();
-
   // skip some frames?!?
   _frameCount++;
   if (_frameCount < _stackFrameNum) {
@@ -588,9 +584,10 @@ void WindowOptim::process()
   _frameCount = 0;
 
   pcl::PointXYZI pointSel;
-
+  ros::Time start=ros::Time::now();
   // relate incoming data to map
   //testT();
+  ros::Time start_conver=ros::Time::now();
   transformAssociateToMap();//
 
   size_t laserCloudCornerLastNum = _laserCloudCornerLast->points.size();
@@ -604,7 +601,7 @@ void WindowOptim::process()
     pointAssociateToMap(_laserCloudSurfLast->points[i], pointSel);
     _laserCloudSurfStack->push_back(pointSel);
   }
-
+ // std::cout<<"time conert:"<<(ros::Time::now()-start_conver).toSec()*1000<<std::endl;
 
   /*pcl::PointXYZI pointOnYAxis;
   pointOnYAxis.x = 0.0;
@@ -759,7 +756,7 @@ void WindowOptim::process()
       }
     }
   }*/
-
+  ros::Time start_prepare=ros::Time::now();
   // prepare valid map corner and surface cloud for pose optimization
   _laserCloudCornerFromMap->clear();
   _laserCloudSurfFromMap->clear();
@@ -768,7 +765,6 @@ void WindowOptim::process()
     *_laserCloudCornerFromMap += *_submap_corner[i];
     *_laserCloudSurfFromMap += *_submap_surf[i];
   }
-  std::cout<<"submap size:"<<_submap_corner.size()<<std::endl;
   // prepare feature stack clouds for pose optimization
   size_t laserCloudCornerStackNum2 = _laserCloudCornerStack->points.size();
   for (int i = 0; i < laserCloudCornerStackNum2; i++) {
@@ -797,12 +793,14 @@ void WindowOptim::process()
 
   _laserCloudCornerStack->clear();
   _laserCloudSurfStack->clear();
+ // std::cout<<"prepare time:"<<(ros::Time::now()-start_prepare).toSec()*1000<<std::endl;
 //_transformTobeMapped表示T_me
   // run pose optimization
   //ros::Time start=ros::Time::now();
+  ros::Time start_optim=ros::Time::now();
   optimizeTransformTobeMapped();
-
-  Eigen::Isometry3d _now_pose=angleZXYToIsometry(_transformAftMapped.rot_x,_transformAftMapped.rot_y,
+  //std::cout<<"optim time:"<<(ros::Time::now()-start_optim).toSec()*1000<<std::endl;
+  _now_pose=angleZXYToIsometry(_transformAftMapped.rot_x,_transformAftMapped.rot_y,
                                            _transformAftMapped.rot_z,_transformAftMapped.pos);
   //update submap
  /* if(_keyFrameUpdateConPtr->update(Twe,_timeLaserOdometry,laserCloudSurround,_submap_flat_cloud))
@@ -828,9 +826,11 @@ void WindowOptim::process()
         _laserCloudSurfArray[ind]->clear();
       }
   }*/
+   ros::Time start_update=ros::Time::now();
   update(_now_pose,_timeLaserOdometry);
-  //std::cout<<"_now_pose"<<_now_pose.matrix()<<std::endl;
+//  std::cout<<"_now_pose 111"<<_now_pose.matrix()<<std::endl;
   publishResult();
+ // std::cout<<"update time:"<<(ros::Time::now()-start_update).toSec()*1000<<std::endl;
   // store down sized corner stack points in corresponding cube clouds
 
  /* for (int i = 0; i < laserCloudCornerStackNum; i++) {
@@ -888,8 +888,8 @@ void WindowOptim::process()
     _laserCloudCornerArray[ind].swap(_laserCloudCornerDSArray[ind]);
     _laserCloudSurfArray[ind].swap(_laserCloudSurfDSArray[ind]);
   }*/
-  clock_t end = clock();
-  //std::cout<<"map Running time: "<<(double)(end-begin)/CLOCKS_PER_SEC*1000<<"ms"<<std::endl;
+  ros::Time end = ros::Time::now();
+  //std::cout<<"map Running time: "<<(end-start).toSec()*1000<<"ms"<<std::endl;
 
   // publish result
   //();
@@ -1290,10 +1290,18 @@ void WindowOptim::publishResult()
   _laserCloudSurround->clear();
   *_laserCloudSurround+=*_laserCloudCornerStackDS;
   *_laserCloudSurround+=*_laserCloudSurfStackDS;
+  //std::cout<<"_laserCloudSurround"<<_laserCloudSurround->size()<<std::endl;
   publishCloudMsg(_pubLaserCloudFullRes, *_laserCloudSurround, _timeLaserOdometry, "/camera_init");
   publishCloudMsg(_pub_flat_cloud,*_laser_flat_cloud_ds,_timeLaserOdometry,"/camera_init");
    nav_msgs::Odometry odom=poseToodometry(_now_pose,_timeLaserOdometry);
+
    _pubOdomAftMapped.publish(odom);
+   geometry_msgs::Quaternion geo_quat=odom.pose.pose.orientation;
+   Eigen::Quaterniond eig_qua(geo_quat.w,geo_quat.x,geo_quat.y,geo_quat.z);
+   Eigen::Isometry3d pose=Eigen::Isometry3d::Identity();
+
+   pose.rotate(eig_qua.toRotationMatrix());
+   pose.pretranslate(Eigen::Vector3d(odom.pose.pose.position.x,odom.pose.pose.position.y,odom.pose.pose.position.z));
 }
 
 } // end namespace loam

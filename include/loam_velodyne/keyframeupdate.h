@@ -49,13 +49,14 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
    * @return  if true, the frame should be registered
    */
   bool update(const Eigen::Isometry3d& pose,ros::Time nowTime,
-              const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& cloud,
-              const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& flat_cloud) {
+              const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud,
+              const pcl::PointCloud<pcl::PointXYZI>::Ptr& flat_cloud) {
     // first frame is always registered to the graph
     if(is_first) {
       is_first = false;
       _prev_keypose = pose;
       _prev_time=nowTime;
+      _accum_distance=0;
       *_submap_cloud+=*cloud;
       *_submap_flat_cloud+=*flat_cloud;
       return false;
@@ -80,14 +81,40 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
       *_submap_flat_cloud+=*transform_flat_cloud;
       return false;
     }
-    _accum_distance += dx;
-    _prev_keypose = pose;
-    _prev_time=nowTime;
+    _accum_distance_buff= dx;
+    _prev_keypose_buff = pose;
+    _prev_time_buff=nowTime;
+    _submap_flat_cloud_buff=flat_cloud;
+    _submap_cloud_buff=cloud;
     return true;
   }
+void param_update()
+{
+  _accum_distance+=_accum_distance_buff;
+  _prev_keypose=_prev_keypose_buff;
+  _prev_time=_prev_time_buff;
+  _submap_flat_cloud=_submap_flat_cloud_buff;
+  _submap_cloud=_submap_cloud_buff;
+}
 double get_accum_distance()
 {
   return _accum_distance;
+}
+Eigen::Isometry3d get_prev_pose()
+{
+  return _prev_keypose;
+}
+ros::Time get_prev_time()
+{
+  return _prev_time;
+}
+pcl::PointCloud<pcl::PointXYZI>::Ptr get_submap_cloud()
+{
+  return _submap_cloud;
+}
+pcl::PointCloud<pcl::PointXYZI>::Ptr get_submap_flat_cloud()
+{
+  return _submap_flat_cloud;
 }
 public:
   std::shared_ptr<KeyFrame> _kefFrame_ptr;
@@ -97,12 +124,18 @@ private:
   double _keyframe_delta_angle;      //
   double _keyframe_delta_time;
   bool is_first;
-  double _accum_distance;
-public:
+private:
+  double _accum_distance_buff;
+  Eigen::Isometry3d _prev_keypose_buff;
+  ros::Time _prev_time_buff;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_cloud_buff;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud_buff;
+private:
   pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_cloud;
   pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud;
   Eigen::Isometry3d _prev_keypose;
   ros::Time _prev_time;
+  double _accum_distance;
 };
 }
 #endif // KEYFRAMEUPDATE_H

@@ -18,7 +18,7 @@
     <param name="scanPeriod" value="$(arg scanPeriod)" />
   </node>
 
-  <node pkg="loam_velodyne" type="backendOptim" name="backendOptim" output="screen">
+   <node pkg="loam_velodyne" type="backendOptim" name="backendOptim" output="screen">
   </node>
 
   <group if="$(arg rviz)">

@@ -11,7 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
   ndt_omp
-  rviz)
+  rviz
+  cv_bridge)
 add_definitions(-std=c++11 -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2)
 set(CMAKE_CXX_FLAGS "-std=c++11 -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
@@ -31,6 +32,8 @@ find_package(Qt5 REQUIRED Core Widgets)#added
 set(QT_LIBRARIES Qt5::Widgets)#added
 add_definitions(-DQT_NO_KEYWORDS)
 
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
 find_package(OpenMP)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -59,7 +62,7 @@ generate_messages(
  nav_msgs
 )
 catkin_package(
-  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime ndt_omp
+  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime ndt_omp cv_bridge
   DEPENDS EIGEN3 PCL
   INCLUDE_DIRS include
   LIBRARIES loam
@@ -90,6 +93,8 @@ target_link_libraries(laserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 add_executable(transformMaintenance src/transform_maintenance_node.cpp)
 target_link_libraries(transformMaintenance ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 
+add_executable(laserImage_node src/laser_image_node.cpp)
+target_link_libraries(laserImage_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 #add_executable(floorDetection src/floor_detection_node.cpp)
 #target_link_libraries(floorDetection ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 

@@ -84,9 +84,10 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   geometry_msgs::Quaternion geo_quat=odom->pose.pose.orientation;
   Eigen::Quaterniond eig_qua(geo_quat.w,geo_quat.x,geo_quat.y,geo_quat.z);
   Eigen::Isometry3d pose=Eigen::Isometry3d::Identity();
-  std::cout<<
+
   pose.rotate(eig_qua.toRotationMatrix());
   pose.pretranslate(Eigen::Vector3d(odom->pose.pose.position.x,odom->pose.pose.position.y,odom->pose.pose.position.z));
+ // std::cout<<"pose"<<pose.matrix()<<std::endl;
   //publish now odometry
   visualization_msgs::Marker sphere_marker;
   sphere_marker.header.frame_id = "/camera_init";
@@ -111,22 +112,17 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   {
     return;
   }
-  double accum_d=_keyframe_update->get_accum_distance();
   std::shared_ptr<KeyFrame> key_frame(new KeyFrame());
-  key_frame->_pose=_keyframe_update->_prev_keypose;
-  key_frame->_accumulate_distance=accum_d;
-  key_frame->_stamp=_keyframe_update->_prev_time;
-  key_frame->_cloud=_keyframe_update->_submap_cloud;
+  key_frame->_pose=_keyframe_update->get_prev_pose();
+  key_frame->_accumulate_distance=_keyframe_update->get_accum_distance();
+  key_frame->_stamp=_keyframe_update->get_prev_time();
+  key_frame->_cloud=_keyframe_update->get_submap_cloud();
   if(_is_floor_optim)
   {
-    boost::optional<Eigen::Vector4f> floor_coeffes=_floor_detecter->detect(_keyframe_update->_submap_flat_cloud);
+    boost::optional<Eigen::Vector4f> floor_coeffes=_floor_detecter->detect(_keyframe_update->get_submap_flat_cloud());
     key_frame->_floor_coeffes=floor_coeffes;
   }
-  //std::cout<<"key_frame->_cloud1:"<<key_frame->_cloud->size()<<std::endl;
-  _keyframe_update->_submap_cloud=laser_pointcloud;
-  //std::cout<<"key_frame->_cloud2:"<<key_frame->_cloud->size()<<std::endl;
-  _keyframe_update->_submap_flat_cloud=laser_flat_cloud;
-
+  _keyframe_update->param_update();
   std::lock_guard<std::mutex> lock(_keyFrames_queue_mutex);
   _deque_KeyFrames.push_back(key_frame);
 }
@@ -227,7 +223,7 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
   }
   std::cout<<"loop closure using time is:"<<(ros::Time::now()-start_loop).toSec()*1000<<"ms"<<std::endl;
   //graph_slam->optimization();
-  graph_slam->optimize();
+//  graph_slam->optimize();
   std::copy(_new_keyFrames.begin(),_new_keyFrames.end(),std::back_inserter(_keyFrames));
   _new_keyFrames.clear();
   KeyFrame::Ptr last_key_frame= _keyFrames.back();

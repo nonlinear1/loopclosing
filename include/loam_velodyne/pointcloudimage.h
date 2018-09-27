@@ -22,10 +22,9 @@ public:
   Eigen::Vector3d _t;
   ros::Time _stamp;
 };
-template<class PointT>
 struct PCloudPose
 {
-  pcl::PointCloud<PointT>::Ptr _cloud;
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr _cloud;
   Eigen::Quaterniond _r;
   Eigen::Vector3d _t;
   ros::Time _stamp;
@@ -47,8 +46,8 @@ public:
   Eigen::Matrix<double,3,4> _projected;
   Eigen::Isometry3d _relative_pose;
   int _height,_width;
-  std::vector<std::unique_ptr<CircularBuffer<Image>>> _images_bufffer;
-  std::vector<PCloudPose<pcl::PointXYZRGBA>> _vec_pointcloud;
+  std::vector<CircularBuffer<Image>> _images_bufffer;
+  std::vector<PCloudPose> _vec_pointcloud;
   std::vector<std::vector<Image>> _vec_pose_image;
   int _camera_number;
   ros::Publisher _pub_pointscloud;
@@ -57,6 +56,7 @@ public:
   std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> _sub_odom;
   std::unique_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry>> _syn;
   ros::Subscriber _sub_image;
+
 };
 }
 #endif // POINTCLOUDIMAGE_H
