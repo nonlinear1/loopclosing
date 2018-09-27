@@ -35,7 +35,8 @@ public:
   void laser_submap_vecodom_callback(const loam_velodyne::VectorOdometryConstPtr &vec_odom);
 
   void laser_cloud_odom_vecodom_callback(const sensor_msgs::PointCloud2ConstPtr& cloud,
-                                         const nav_msgs::OdometryConstPtr& odom);
+                                         const nav_msgs::OdometryConstPtr& odom,
+                                         const sensor_msgs::PointCloud2ConstPtr& flat);
   bool flush_floor_queue();
   bool flush_keyFrame_queue();
   void graph_optimization_timer_callback(const ros::TimerEvent& event);
@@ -60,8 +61,9 @@ public:
   //subrible pointcloud,odometry and submap vector odometry
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_laser_submap_pointcloud;
   std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> _sub_submap_odom;
+  std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_flat_cloud;
   std::unique_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry,
-  loam_velodyne::VectorOdometry>> _time_syn;
+  sensor_msgs::PointCloud2>> _time_syn;
 
   ros::Subscriber _sub_floor_coeffs;
 

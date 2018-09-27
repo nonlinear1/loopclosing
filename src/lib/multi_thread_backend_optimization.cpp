@@ -35,15 +35,17 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
  _floor_detecter.reset(new FloorDetection());
  _floor_detecter->setup(nh,private_nh);
 
-  _info_calculator.reset(new InformationMatrixCalculator(nh));
-  _loop_detector.reset(new LoopDetector(nh));
-  graph_slam.reset(new GraphSLAM());
+   _info_calculator.reset(new InformationMatrixCalculator(nh));
+   _loop_detector.reset(new LoopDetector(nh));
+   graph_slam.reset(new GraphSLAM());
    _map_generate.reset(new MapCloudGenerate());
   _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/velodyne_cloud_registered",2));
   _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
+  _sub_flat_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_flat_cloud_2",2));
+
   _time_syn.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry,
-                  loam_velodyne::VectorOdometry>(*_sub_laser_submap_pointcloud,*_sub_submap_odom,2));
-  _time_syn->registerCallback(boost::bind(&BackendOptimization::laser_cloud_odom_vecodom_callback, this, _1, _2));
+                  sensor_msgs::PointCloud2>(*_sub_laser_submap_pointcloud,*_sub_submap_odom,*_sub_flat_cloud,2));
+  _time_syn->registerCallback(boost::bind(&BackendOptimization::laser_cloud_odom_vecodom_callback, this, _1, _2,_3));
 
   //_sub_floor_coeffs=nh.subscribe<loam_velodyne::FloorCoeffs>("/laser_cloud_normal",32,&BackendOptimization::laser_floor_coeffs_callback,this);
 
@@ -68,11 +70,14 @@ void BackendOptimization::laser_odom_callback(const nav_msgs::OdometryConstPtr& 
 void BackendOptimization::laser_submap_vecodom_callback(const loam_velodyne::VectorOdometryConstPtr &vec_odom){}
 
 void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::PointCloud2ConstPtr& cloud,
-                                       const nav_msgs::OdometryConstPtr& odom)
+                                       const nav_msgs::OdometryConstPtr& odom,
+                                       const sensor_msgs::PointCloud2ConstPtr& flat)
 {
   pcl::PointCloud<pcl::PointXYZI>::Ptr laser_pointcloud(new pcl::PointCloud<pcl::PointXYZI>());
   pcl::fromROSMsg(*cloud, *laser_pointcloud);
 
+  pcl::PointCloud<pcl::PointXYZI>::Ptr laser_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+  pcl::fromROSMsg(*flat,*laser_flat_cloud);
   //publish now odometry
   visualization_msgs::Marker sphere_marker;
   sphere_marker.header.frame_id = "/camera_init";
@@ -97,7 +102,7 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   Eigen::Isometry3d pose=Eigen::Isometry3d::Identity();
   pose.rotate(eig_qua.toRotationMatrix());
   pose.pretranslate(Eigen::Vector3d(odom->pose.pose.position.x,odom->pose.pose.position.y,odom->pose.pose.position.z));
-  if(!_keyframe_update->update(pose,cloud->header.stamp,laser_pointcloud))
+  if(!_keyframe_update->update(pose,cloud->header.stamp,laser_pointcloud,laser_flat_cloud))
   {
     return;
   }
@@ -107,10 +112,11 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   key_frame->_accumulate_distance=accum_d;
   key_frame->_stamp=_keyframe_update->_prev_time;
   key_frame->_cloud=_keyframe_update->_submap_cloud;
-  boost::optional<Eigen::Vector4f> floor_coeffes=_floor_detecter->detect(_keyframe_update->_submap_cloud);
+  boost::optional<Eigen::Vector4f> floor_coeffes=_floor_detecter->detect(_keyframe_update->_submap_flat_cloud);
   key_frame->_floor_coeffes=floor_coeffes;
 
   _keyframe_update->_submap_cloud.reset(laser_pointcloud);
+  _keyframe_update->_submap_flat_cloud.reset(laser_flat_cloud);
 
   std::lock_guard<std::mutex> lock(_keyFrames_queue_mutex);
   _deque_KeyFrames.push_back(key_frame);

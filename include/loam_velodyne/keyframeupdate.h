@@ -22,7 +22,9 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
       _keyframe_delta_trans(2.0),
       _keyframe_delta_angle(2.0),
       _keyframe_delta_time(2.0),
-      _submap_cloud( new pcl::PointCloud<pcl::PointXYZI>())
+      _accum_distance(0),
+      _submap_cloud( new pcl::PointCloud<pcl::PointXYZI>()),
+      _submap_flat_cloud( new pcl::PointCloud<pcl::PointXYZI>())
   {
      float fParam;
      if(pnh.getParam("keyframe_delta_trans",fParam))
@@ -46,13 +48,16 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
    * @param pose  pose of the frame
    * @return  if true, the frame should be registered
    */
-  bool update(const Eigen::Isometry3d& pose,ros::Time nowTime,const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& cloud) {
+  bool update(const Eigen::Isometry3d& pose,ros::Time nowTime,
+              const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& cloud,
+              const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& flat_cloud) {
     // first frame is always registered to the graph
     if(is_first) {
       is_first = false;
       _prev_keypose = pose;
       _prev_time=nowTime;
       *_submap_cloud+=*cloud;
+      *_submap_flat_cloud+=*flat_cloud;
       return false;
     }
 
@@ -68,6 +73,11 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
       transform_cloud->reserve(cloud->size());
       pcl::transformPointCloud(*(cloud),*(transform_cloud),delta.cast<float>());
       *_submap_cloud+=*transform_cloud;
+
+      pcl::PointCloud<pcl::PointXYZI>::Ptr transform_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+      transform_flat_cloud->reserve(flat_cloud->size());
+      pcl::transformPointCloud(*flat_cloud,*transform_flat_cloud,delta.cast<float>);
+      *_submap_flat_cloud+=transform_flat_cloud;
       return false;
     }
     _accum_distance += dx;
@@ -90,6 +100,7 @@ private:
   double _accum_distance;
 public:
   pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_cloud;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud;
   Eigen::Isometry3d _prev_keypose;
   ros::Time _prev_time;
 };

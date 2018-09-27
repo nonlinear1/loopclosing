@@ -66,6 +66,10 @@ WindowOptim::WindowOptim(const float& scanPeriod,
         _laserCloudWidth(21),//21
         _laserCloudHeight(11),//11
         _laserCloudDepth(21),//21
+        _keyframeDeltaTrans(1),
+        _keyframeDeltaAngle(1),
+        _keyframeDeltaTime(1),
+        _submap_size(30),
         _laserCloudNum(_laserCloudWidth * _laserCloudHeight * _laserCloudDepth),
         _laserCloudCornerLast(new pcl::PointCloud<pcl::PointXYZI>()),
         _laserCloudSurfLast(new pcl::PointCloud<pcl::PointXYZI>()),
@@ -78,6 +82,8 @@ WindowOptim::WindowOptim(const float& scanPeriod,
         _laserCloudSurroundDS(new pcl::PointCloud<pcl::PointXYZI>()),
         _laserCloudCornerFromMap(new pcl::PointCloud<pcl::PointXYZI>()),
         _laserCloudSurfFromMap(new pcl::PointCloud<pcl::PointXYZI>()),
+        _laser_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>()),
+        _laser_flat_cloud_ds(new pcl::PointCloud<pcl::PointXYZI>()),
         _newLaserCloudCornerLast(false),
         _newLaserCloudSurfLast (false),
         _newLaserCloudFullRes (false),
@@ -108,6 +114,7 @@ WindowOptim::WindowOptim(const float& scanPeriod,
   }
   // setup down size filters
   _downSizeFilterCorner.setLeafSize(0.2, 0.2, 0.2);
+  _down_filter_fat.setLeafSize(0.2,0.2,0.2);
   _downSizeFilterSurf.setLeafSize(0.4, 0.4, 0.4);
   _downSizeFilterMap.setLeafSize(0.6, 0.6, 0.6);
 }
@@ -211,7 +218,7 @@ bool WindowOptim::setup(ros::NodeHandle& node,
   //_pubLaserCloudSurround = node.advertise<sensor_msgs::PointCloud2> ("/laser_cloud_surround", 2);
   _pubLaserCloudFullRes = node.advertise<sensor_msgs::PointCloud2> ("/velodyne_cloud_registered", 2);
    _pubOdomAftMapped = node.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 5);
-
+  _pub_flat_cloud=node.advertise<sensor_msgs::PointCloud2>("/laser_flat_cloud_2");
   // subscribe to laser odometry topics
  // _subLaserCloudCornerLast = node.subscribe<sensor_msgs::PointCloud2>
  //     ("/laser_cloud_corner_last", 2, &LaserMapping::laserCloudCornerLastHandler, this);
@@ -227,13 +234,15 @@ bool WindowOptim::setup(ros::NodeHandle& node,
 
   // subscribe to IMU topic
   _subImu = node.subscribe<sensor_msgs::Imu> ("/imu/data", 50, &WindowOptim::imuHandler, this);
+  _sub_flat_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(node,"/laser_flat_cloud",2));
   _subLaserCloudCornerLastPtr.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(node,"/laser_cloud_corner_last",2));
   _subLaserCloudSurfLastPtr.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(node,"/laser_cloud_surf_last",2));
   _subLaserCloudFullResPtr.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(node,"/velodyne_cloud_3",2));
   _subLaserOdometry.reset(new message_filters::Subscriber<nav_msgs::Odometry>(node,"/laser_odom_to_init",5));
-  _sync.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,nav_msgs::Odometry,sensor_msgs::PointCloud2>
-          (*_subLaserCloudCornerLastPtr,*_subLaserCloudSurfLastPtr,*_subLaserCloudFullResPtr,*_subLaserOdometry,3));
-  _sync->registerCallback(boost::bind(&WindowOptim::laserBindCloudOdometryHandler,this,_1,_2,_3,_4));
+  _sync.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,sensor_msgs::PointCloud2
+              ,nav_msgs::Odometry,sensor_msgs::PointCloud2,sensor_msgs::PointCloud2>
+          (*_subLaserCloudCornerLastPtr,*_subLaserCloudSurfLastPtr,*_subLaserCloudFullResPtr,*_subLaserOdometry,*_sub_flat_cloud,3));
+  _sync->registerCallback(boost::bind(&WindowOptim::laserBindCloudOdometryHandler,this,_1,_2,_3,_4,_5));
   return true;
 }
 
@@ -416,7 +425,8 @@ void ::pointAssociateTobeMapped(const pcl::PointXYZI& pi, pcl::PointXYZI& po)
 void WindowOptim::laserBindCloudOdometryHandler(const sensor_msgs::PointCloud2ConstPtr& corner,
                                                  const sensor_msgs::PointCloud2ConstPtr& surf,
                                                  const sensor_msgs::PointCloud2ConstPtr& fullRes,
-                                                 const nav_msgs::OdometryConstPtr & odometry)
+                                                 const nav_msgs::OdometryConstPtr & odometry,
+                                                const sensor_msgs::PointCloud2ConstPtr& flat)
 {
     _timeLaserCloudCornerLast=corner->header.stamp;
     _timeLaserCloudSurfLast=surf->header.stamp;
@@ -430,6 +440,9 @@ void WindowOptim::laserBindCloudOdometryHandler(const sensor_msgs::PointCloud2Co
     _laserCloudSurfLast->clear();
     pcl::fromROSMsg(*surf, *_laserCloudSurfLast);
     _newLaserCloudSurfLast = true;
+
+    _laser_flat_cloud->clear();
+    pcl::fromROSMsg(*flat,*_laser_flat_cloud);
 
     _laserCloudFullRes->clear();
     pcl::fromROSMsg(*fullRes, *_laserCloudFullRes);
@@ -750,7 +763,7 @@ void WindowOptim::process()
   // prepare valid map corner and surface cloud for pose optimization
   _laserCloudCornerFromMap->clear();
   _laserCloudSurfFromMap->clear();
-  size_t laserCloudValidNum = _laserCloudValidInd.size();
+  //size_t laserCloudValidNum = _laserCloudValidInd.size();
   for (int i = 0; i < _submap_surf.size(); i++) {
     *_laserCloudCornerFromMap += *_submap_corner[i];
     *_laserCloudSurfFromMap += *_submap_surf[i];
@@ -771,12 +784,16 @@ void WindowOptim::process()
   _laserCloudCornerStackDS->clear();
   _downSizeFilterCorner.setInputCloud(_laserCloudCornerStack);
   _downSizeFilterCorner.filter(*_laserCloudCornerStackDS);
-  size_t laserCloudCornerStackNum = _laserCloudCornerStackDS->points.size();
+  //size_t laserCloudCornerStackNum = _laserCloudCornerStackDS->points.size();
 
   _laserCloudSurfStackDS->clear();
   _downSizeFilterSurf.setInputCloud(_laserCloudSurfStack);
   _downSizeFilterSurf.filter(*_laserCloudSurfStackDS);
-  size_t laserCloudSurfStackNum = _laserCloudSurfStackDS->points.size();
+  //size_t laserCloudSurfStackNum = _laserCloudSurfStackDS->points.size();
+
+  _laser_flat_cloud_ds->clear();
+  _down_filter_fat.setInputCloud(_laser_flat_cloud);
+  _down_filter_fat.filter(*_laser_flat_cloud_ds);
 
   _laserCloudCornerStack->clear();
   _laserCloudSurfStack->clear();
@@ -1207,8 +1224,8 @@ bool WindowOptim::update(const Eigen::Isometry3d& now_pose,ros::Time& now_time) 
   // calculate the delta transformation from the previous keyframe
   Eigen::Isometry3d delta = _prev_keypose.inverse() * now_pose;
   float delta_time=now_time.toSec()-_prev_time.toSec();
-  double dx = delta.translation().norm();
-  double da = std::acos(Eigen::Quaterniond(delta.linear()).w());
+  double dx = std::abs(delta.translation().norm());
+  double da = std::abs(std::acos(Eigen::Quaterniond(delta.linear()).w()));
   dx=_submap_corner.size()==_submap_size?dx*3:dx;
   da=_submap_corner.size()==_submap_size?da*3:da;
   delta_time=_submap_corner.size()==_submap_size?delta_time*3:delta_time;
@@ -1273,7 +1290,7 @@ void WindowOptim::publishResult()
   *_laserCloudSurround+=*_laserCloudCornerStackDS;
   *_laserCloudSurround+=*_laserCloudSurfStackDS;
   publishCloudMsg(_pubLaserCloudFullRes, *_laserCloudSurround, _timeLaserOdometry, "/camera_init");
-
+  publishCloudMsg(_pub_flat_cloud,*_laser_flat_cloud_ds,_timeLaserOdometry,"/camera_init");
    nav_msgs::Odometry odom=poseToodometry(_now_pose,_timeLaserOdometry);
    _pubOdomAftMapped.publish(odom);
 }

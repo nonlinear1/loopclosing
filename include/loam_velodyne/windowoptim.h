@@ -78,7 +78,8 @@ public:
   void laserBindCloudOdometryHandler(const sensor_msgs::PointCloud2ConstPtr& corner,
                                      const sensor_msgs::PointCloud2ConstPtr& surf,
                                      const sensor_msgs::PointCloud2ConstPtr& fullRes,
-                                     const nav_msgs::OdometryConstPtr & odometry);
+                                     const nav_msgs::OdometryConstPtr & odometry,
+                                     const sensor_msgs::PointCloud2ConstPtr& flat);
   /** \brief Handler method for a new last surface cloud.
    *
    * @param surfacePointsLastMsg the new last surface cloud message
@@ -223,9 +224,15 @@ private:
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _subLaserCloudSurfLastPtr;
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _subLaserCloudFullResPtr;
   std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> _subLaserOdometry;
-  std::unique_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,nav_msgs::Odometry>> _sync;
+  std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_flat_cloud;
+  std::unique_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,sensor_msgs::PointCloud2
+  ,sensor_msgs::PointCloud2,nav_msgs::Odometry,sensor_msgs::PointCloud2>> _sync;
 
   //submap flat sub,pub
+  pcl::PointCloud<pcl::PointXYZI>::Ptr _laser_flat_cloud;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr _laser_flat_cloud_ds;
+  pcl::VoxelGrid<pcl::PointXYZI> _down_filter_fat;
+  ros::Publisher _pub_flat_cloud;
 
   std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> _submap_surf;
   std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> _submap_corner;
