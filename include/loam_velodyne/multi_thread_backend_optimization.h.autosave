@@ -19,6 +19,7 @@
 #include"loam_velodyne/GlobalMap.h"
 #include<visualization_msgs/MarkerArray.h>
 #include"loam_velodyne/keyframeupdate.h"
+#include"floordetection.h"
 namespace loam {
 class BackendOptimization
 {
@@ -93,6 +94,7 @@ public:
   ros::Publisher _vis_pub;
   ros::Publisher _vis_odom_pub;
   std::unique_ptr<KeyframeUpdater> _keyframe_update;
+  std::unique_ptr<FloorDetection> _floor_detecter;
 };
 }
 #endif // MULTI_THREAD_BACKEND_OPTIMIZATION_H

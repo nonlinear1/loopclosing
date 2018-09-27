@@ -26,14 +26,14 @@ bool PointCloudImage::setup(ros::NodeHandle& nh,ros::NodeHandle& private_nh)
     _images_bufffer[i].reset(new CircularBuffer<Image>(50));
   }
 
-  _sub_pointscloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_points",2));
-  _sub_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/odom",2));
+  _sub_pointscloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/velodyne_cloud_registered",2));
+  _sub_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
   _syn.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry>(*_sub_pointscloud,*_sub_odom,2));
   _syn->registerCallback(boost::bind(&PointCloudImage::pointcloudCallback,this,_1,_2));
   _sub_image=nh.subscribe<sensor_msgs::Image>("/image",2,&PointCloudImage::imageCallback,this);
 
-  _pub_pointscloud=nh.advertise<sensor_msgs::PointCloud2>("/points",2);
-  _pub_odom=nh.advertise<nav_msgs::Odometry>("odom",2);
+  _pub_pointscloud=nh.advertise<sensor_msgs::PointCloud2>("/rgb_points_cloud",2);
+  _pub_odom=nh.advertise<nav_msgs::Odometry>("/rgb_points_cloud_odom",2);
 }
 PointCloudImage::PointCloudImage()
 {
