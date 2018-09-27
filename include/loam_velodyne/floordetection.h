@@ -32,15 +32,15 @@ public:
                           const float& floor_normal_thresh=10.0,
                           const bool& use_normal_filtering=false,
                           const float& normal_filter_thresh=20);
- void cloud_callback(const sensor_msgs::PointCloud2ConstPtr& laserCloudSurfMsg);
+ //void cloud_callback(const sensor_msgs::PointCloud2ConstPtr& laserCloudSurfMsg);
  boost::optional<Eigen::Vector4f> detect(const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud);
  pcl::PointCloud<pcl::PointXYZI>::Ptr plane_clip(const pcl::PointCloud<pcl::PointXYZI>::Ptr& src_cloud, const Eigen::Vector4f& plane, bool negative);
  pcl::PointCloud<pcl::PointXYZI>::Ptr normal_filtering(const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud);
- bool setup(ros::NodeHandle nh,ros::NodeHandle privateNode);
- void process();
- void spin();
- void reset();
- void publishResult(boost::optional<Eigen::Vector4f> floor);
+ bool setup(ros::NodeHandle& nh,ros::NodeHandle& privateNode);
+ //void process();
+// void spin();
+ //void reset();
+ //void publishResult(boost::optional<Eigen::Vector4f> floor);
 private:
   // ROS topics
   //ros::Subscriber _sub_SubmapFlatCloud;

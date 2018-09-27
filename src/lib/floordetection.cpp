@@ -18,8 +18,8 @@ FloorDetection::FloorDetection(const float& sensor_height,
 
 {
 }
-bool FloorDetection::setup(ros::NodeHandle nh,
-                           ros::NodeHandle privateNode)
+bool FloorDetection::setup(ros::NodeHandle& nh,
+                           ros::NodeHandle& privateNode)
 {
   bool bparam;
   int iparam;

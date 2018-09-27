@@ -32,6 +32,7 @@ public:
   pcl::PointCloud<pcl::PointXYZI>::ConstPtr _cloud;        // point cloud
 
   Eigen::Isometry3d _pose;
+  boost::optional<Eigen::Vector4f> _floor_coeffes;
   float _accumulate_distance;
   g2o::VertexSE3* _node;
 };
