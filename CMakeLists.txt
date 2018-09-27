@@ -90,12 +90,13 @@ target_link_libraries(laserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 add_executable(transformMaintenance src/transform_maintenance_node.cpp)
 target_link_libraries(transformMaintenance ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 
-add_executable(floorDetection src/floor_detection_node.cpp)
-target_link_libraries(floorDetection ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
+#add_executable(floorDetection src/floor_detection_node.cpp)
+#target_link_libraries(floorDetection ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 
-add_executable(laserSubMapping src/laser_submapping_node.cpp)
-target_link_libraries(laserSubMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
-
+#add_executable(laserSubMapping src/laser_submapping_node.cpp)
+#target_link_libraries(laserSubMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
+add_executable(windowoptim_node src/windowoptim_node.cpp)
+target_link_libraries(windowoptim_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 add_executable(backendOptim src/backend_optimization_node.cpp)
 target_link_libraries(backendOptim
     ${catkin_LIBRARIES}

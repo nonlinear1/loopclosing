@@ -6,11 +6,11 @@ add_library(loam
             LaserMapping.cpp
             TransformMaintenance.cpp
             floordetection.cpp
-            lasersubmapping.cpp
             information_matrix_calculator.cpp
             graph_slam.cpp
             registrations.cpp
-            multi_thread_backend_optimization.cpp)
+            multi_thread_backend_optimization.cpp
+            windowoptim.cpp)
 target_link_libraries(loam
     ${catkin_LIBRARIES}
     ${PCL_LIBRARIES}

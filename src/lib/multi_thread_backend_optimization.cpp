@@ -16,7 +16,8 @@ BackendOptimization::BackendOptimization():
   _floor_edge_stddev(10.0),
   _graph_optimization_time_duration(3.0),
   _pub_map_pointcloud_time_duration(10.0),
-  _accumulate_distance(0)
+  _accumulate_distance(0),
+  _is_floor_optim(true)
 {
    _trans_odom2map=Eigen::Isometry3d::Identity();
     _display_distance_threash=100;
@@ -30,6 +31,7 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
  _graph_optimization_time_duration=private_nh.param<float>("graph_optimization_time_duration",3.0);
  _pub_map_pointcloud_time_duration=private_nh.param<float>("pub_map_pointcloud_time_duration",10.0);
  _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",10.0);
+ _is_floor_optim=private_nh.param<bool>("floor_optim",false);
 
  _keyframe_update.reset(new KeyframeUpdater(private_nh));
  _floor_detecter.reset(new FloorDetection());
@@ -78,6 +80,13 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr laser_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>());
   pcl::fromROSMsg(*flat,*laser_flat_cloud);
+
+  geometry_msgs::Quaternion geo_quat=odom->pose.pose.orientation;
+  Eigen::Quaterniond eig_qua(geo_quat.w,geo_quat.x,geo_quat.y,geo_quat.z);
+  Eigen::Isometry3d pose=Eigen::Isometry3d::Identity();
+  std::cout<<
+  pose.rotate(eig_qua.toRotationMatrix());
+  pose.pretranslate(Eigen::Vector3d(odom->pose.pose.position.x,odom->pose.pose.position.y,odom->pose.pose.position.z));
   //publish now odometry
   visualization_msgs::Marker sphere_marker;
   sphere_marker.header.frame_id = "/camera_init";
@@ -97,11 +106,7 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   sphere_marker.color.a = 0.3;
   _vis_odom_pub.publish(sphere_marker);
 
-  geometry_msgs::Quaternion geo_quat=odom->pose.pose.orientation;
-  Eigen::Quaterniond eig_qua(geo_quat.w,geo_quat.x,geo_quat.y,geo_quat.z);
-  Eigen::Isometry3d pose=Eigen::Isometry3d::Identity();
-  pose.rotate(eig_qua.toRotationMatrix());
-  pose.pretranslate(Eigen::Vector3d(odom->pose.pose.position.x,odom->pose.pose.position.y,odom->pose.pose.position.z));
+
   if(!_keyframe_update->update(pose,cloud->header.stamp,laser_pointcloud,laser_flat_cloud))
   {
     return;
@@ -112,11 +117,15 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   key_frame->_accumulate_distance=accum_d;
   key_frame->_stamp=_keyframe_update->_prev_time;
   key_frame->_cloud=_keyframe_update->_submap_cloud;
-  boost::optional<Eigen::Vector4f> floor_coeffes=_floor_detecter->detect(_keyframe_update->_submap_flat_cloud);
-  key_frame->_floor_coeffes=floor_coeffes;
-
-  _keyframe_update->_submap_cloud.reset(laser_pointcloud);
-  _keyframe_update->_submap_flat_cloud.reset(laser_flat_cloud);
+  if(_is_floor_optim)
+  {
+    boost::optional<Eigen::Vector4f> floor_coeffes=_floor_detecter->detect(_keyframe_update->_submap_flat_cloud);
+    key_frame->_floor_coeffes=floor_coeffes;
+  }
+  //std::cout<<"key_frame->_cloud1:"<<key_frame->_cloud->size()<<std::endl;
+  _keyframe_update->_submap_cloud=laser_pointcloud;
+  //std::cout<<"key_frame->_cloud2:"<<key_frame->_cloud->size()<<std::endl;
+  _keyframe_update->_submap_flat_cloud=laser_flat_cloud;
 
   std::lock_guard<std::mutex> lock(_keyFrames_queue_mutex);
   _deque_KeyFrames.push_back(key_frame);
@@ -130,6 +139,7 @@ bool BackendOptimization::flush_keyFrame_queue()
   for(int i=0;i<add_frame_num;i++)
   {
     std::shared_ptr<KeyFrame> keyFrame_ptr=_deque_KeyFrames[i];
+   // std::cout<<"keyFrame_ptr :"<<keyFrame_ptr->_cloud->size()<<std::endl;
     //update pose
     Eigen::Isometry3d odom2map= _trans_odom2map*keyFrame_ptr->_pose;
     //add se3 vertex to map
@@ -138,8 +148,8 @@ bool BackendOptimization::flush_keyFrame_queue()
     keyFrame_ptr->_node=pose_node;
     if(keyFrame_ptr->_floor_coeffes)
     {
-      Eigen::Vector4d floor_coeff(*(keyFrame_ptr->_floor_coeffes)[0],*(keyFrame_ptr->_floor_coeffes)[1],
-                                  *(keyFrame_ptr->_floor_coeffes)[2],*(keyFrame_ptr->_floor_coeffes)[3]);
+      Eigen::Vector4d floor_coeff((*(keyFrame_ptr->_floor_coeffes))[0],(*(keyFrame_ptr->_floor_coeffes))[1],
+                                  (*(keyFrame_ptr->_floor_coeffes))[2],(*(keyFrame_ptr->_floor_coeffes))[3]);
       Eigen::Matrix3d information = Eigen::Matrix3d::Identity() * (1.0 / _floor_edge_stddev);
       graph_slam->add_se3_plane_edge(keyFrame_ptr->_node,graph_slam->floor_plane_node,floor_coeff,information);
     }

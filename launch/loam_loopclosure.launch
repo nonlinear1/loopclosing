@@ -14,11 +14,8 @@
     <param name="scanPeriod" value="$(arg scanPeriod)" />
   </node>
 
-  <node pkg="loam_velodyne" type="laserSubMapping" name="laserSubMapping" output="screen">
+  <node pkg="loam_velodyne" type="windowoptim_node" name="windowoptim_node" output="screen">
     <param name="scanPeriod" value="$(arg scanPeriod)" />
-  </node>
-
-  <node pkg="loam_velodyne" type="floorDetection" name="floorDetection" output="screen">
   </node>
 
   <node pkg="loam_velodyne" type="backendOptim" name="backendOptim" output="screen">

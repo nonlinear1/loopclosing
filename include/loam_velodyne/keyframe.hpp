@@ -14,12 +14,14 @@ public:
 using Ptr=std::shared_ptr<KeyFrame>;
   KeyFrame(const nav_msgs::Odometry& odom):
       _cloud(new pcl::PointCloud<pcl::PointXYZI>()),
-      _node(new g2o::VertexSE3)
+      _node(new g2o::VertexSE3),
+      _floor_coeffes(boost::none)
   {
   }
   KeyFrame():
     _cloud(new pcl::PointCloud<pcl::PointXYZI>()),
-    _node(new g2o::VertexSE3)
+    _node(new g2o::VertexSE3),
+    _floor_coeffes(boost::none)
   {
   }
   ~KeyFrame()

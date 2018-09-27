@@ -97,6 +97,9 @@ public:
   ros::Publisher _vis_odom_pub;
   std::unique_ptr<KeyframeUpdater> _keyframe_update;
   std::unique_ptr<FloorDetection> _floor_detecter;
+
+  //whether floor optim
+  bool _is_floor_optim;
 };
 }
 #endif // MULTI_THREAD_BACKEND_OPTIMIZATION_H

@@ -76,8 +76,8 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
       pcl::PointCloud<pcl::PointXYZI>::Ptr transform_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>);
       transform_flat_cloud->reserve(flat_cloud->size());
-      pcl::transformPointCloud(*flat_cloud,*transform_flat_cloud,delta.cast<float>);
-      *_submap_flat_cloud+=transform_flat_cloud;
+      pcl::transformPointCloud(*flat_cloud,*transform_flat_cloud,delta.cast<float>());
+      *_submap_flat_cloud+=*transform_flat_cloud;
       return false;
     }
     _accum_distance += dx;
