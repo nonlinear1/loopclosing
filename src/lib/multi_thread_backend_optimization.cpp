@@ -75,7 +75,7 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
                                        const nav_msgs::OdometryConstPtr& odom,
                                        const sensor_msgs::PointCloud2ConstPtr& flat)
 {
-  pcl::PointCloud<pcl::PointXYZI>::Ptr laser_pointcloud(new pcl::PointCloud<pcl::PointXYZI>());
+  pcl::PointCloud<PointT>::Ptr laser_pointcloud(new pcl::PointCloud<PointT>());
   pcl::fromROSMsg(*cloud, *laser_pointcloud);
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr laser_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>());
@@ -165,7 +165,7 @@ bool BackendOptimization::flush_keyFrame_queue()
   }
   //erase somes frame
   _deque_KeyFrames.erase(_deque_KeyFrames.begin(),_deque_KeyFrames.begin()+add_frame_num);
-  return true;
+ return true;
 }
 /*void BackendOptimization::laser_floor_coeffs_callback(const loam_velodyne::FloorCoeffsConstPtr& floor)
 {
@@ -212,7 +212,7 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
     return;
   }
   ros::Time start_loop=ros::Time::now();
-  std::vector<Loop::Ptr> detect_loops=_loop_detector->detect(_keyFrames,_new_keyFrames);
+/*  std::vector<Loop::Ptr> detect_loops=_loop_detector->detect(_keyFrames,_new_keyFrames);
   for(int i=0;i<detect_loops.size();i++)
   {
     Loop::Ptr loop=detect_loops[i];
@@ -220,7 +220,7 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
     Eigen::MatrixXd infomation= _info_calculator->calc_information_matrix(loop->key1->_cloud,loop->key2->_cloud,relative_pose);
     //graph_slam->addEdgeSE3(loop->key1->_node,loop->key2->_node,relative_pose,infomation);
     graph_slam->add_se3_edge(loop->key1->_node,loop->key2->_node,relative_pose,infomation);
-  }
+  }*/
   std::cout<<"loop closure using time is:"<<(ros::Time::now()-start_loop).toSec()*1000<<"ms"<<std::endl;
   //graph_slam->optimization();
 //  graph_slam->optimize();
@@ -251,7 +251,7 @@ void BackendOptimization::pub_map_pointcloud_timer_callback(const ros::TimerEven
   _snapshot_cloud_mutex.unlock();
 
   ros::Time start=ros::Time::now();
-  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud=_map_generate->generate(snapshot,_display_resolution,_display_distance_threash,_is_global_map);
+  pcl::PointCloud<PointT>::Ptr cloud=_map_generate->generate(snapshot,_display_resolution,_display_distance_threash,_is_global_map);
   if(!cloud)
   {
     std::cout<<"cloud is empty"<<std::endl;
@@ -271,7 +271,7 @@ bool BackendOptimization::save_map_cllback(loam_velodyne::SaveMapRequest& req,lo
   _snapshot_cloud_mutex.lock();
   snapshot=_snapshot_cloud;
   _snapshot_cloud_mutex.unlock();
-  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud=_map_generate->generate(snapshot,req.resolution,_display_distance_threash,true);
+  pcl::PointCloud<PointT>::Ptr cloud=_map_generate->generate(snapshot,req.resolution,_display_distance_threash,true);
   if(!cloud)
   {
     res.success=false;
@@ -379,5 +379,4 @@ visualization_msgs::MarkerArray BackendOptimization::creat_trajectory(const ros:
 
   return maker_array;
 }
-
 }

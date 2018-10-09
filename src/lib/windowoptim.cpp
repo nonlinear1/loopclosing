@@ -215,7 +215,7 @@ bool WindowOptim::setup(ros::NodeHandle& node,
   }
 
   // advertise laser mapping topics
-  //_pubLaserCloudSurround = node.advertise<sensor_msgs::PointCloud2> ("/laser_cloud_surround", 2);
+  _pubLaserCloudSurround = node.advertise<sensor_msgs::PointCloud2> ("/laser_cloud_surround", 2);
   _pubLaserCloudFullRes = node.advertise<sensor_msgs::PointCloud2> ("/velodyne_cloud_registered", 2);
    _pubOdomAftMapped = node.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 5);
   _pub_flat_cloud=node.advertise<sensor_msgs::PointCloud2>("/laser_flat_cloud_2",2);
@@ -1291,6 +1291,7 @@ void WindowOptim::publishResult()
   *_laserCloudSurround+=*_laserCloudCornerStackDS;
   *_laserCloudSurround+=*_laserCloudSurfStackDS;
   //std::cout<<"_laserCloudSurround"<<_laserCloudSurround->size()<<std::endl;
+  publishCloudMsg(_pubLaserCloudSurround, *_laserCloudFullRes, _timeLaserOdometry, "/camera_init");
   publishCloudMsg(_pubLaserCloudFullRes, *_laserCloudSurround, _timeLaserOdometry, "/camera_init");
   publishCloudMsg(_pub_flat_cloud,*_laser_flat_cloud_ds,_timeLaserOdometry,"/camera_init");
    nav_msgs::Odometry odom=poseToodometry(_now_pose,_timeLaserOdometry);

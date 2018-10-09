@@ -25,6 +25,7 @@ class BackendOptimization
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  typedef pcl::PointXYZRGB PointT;
   BackendOptimization();
   bool setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh );
   void process();

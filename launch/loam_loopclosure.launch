@@ -17,10 +17,11 @@
   <node pkg="loam_velodyne" type="windowoptim_node" name="windowoptim_node" output="screen">
     <param name="scanPeriod" value="$(arg scanPeriod)" />
   </node>
-
-   <node pkg="loam_velodyne" type="backendOptim" name="backendOptim" output="screen">
+   <node pkg="loam_velodyne" type="laserImage_node" name="laserImage_node" output="screen">
+    <param name="camera_number" value="1" />
   </node>
-
+<node pkg="loam_velodyne" type="backendOptim" name="backendOptim" output="screen">
+  </node>
   <group if="$(arg rviz)">
     <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find loam_velodyne)/rviz_cfg/loam_loop.rviz" />
   </group>

@@ -11,15 +11,16 @@ namespace loam {
 class KeyFrame {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  typedef pcl::PointXYZRGB PointT;
 using Ptr=std::shared_ptr<KeyFrame>;
   KeyFrame(const nav_msgs::Odometry& odom):
-      _cloud(new pcl::PointCloud<pcl::PointXYZI>()),
+      _cloud(new pcl::PointCloud<PointT>()),
       _node(new g2o::VertexSE3),
       _floor_coeffes(boost::none)
   {
   }
   KeyFrame():
-    _cloud(new pcl::PointCloud<pcl::PointXYZI>()),
+    _cloud(new pcl::PointCloud<PointT>()),
     _node(new g2o::VertexSE3),
     _floor_coeffes(boost::none)
   {
@@ -31,7 +32,7 @@ using Ptr=std::shared_ptr<KeyFrame>;
 
 public:
   ros::Time _stamp;                                // timestamp
-  pcl::PointCloud<pcl::PointXYZI>::ConstPtr _cloud;        // point cloud
+  pcl::PointCloud<PointT>::ConstPtr _cloud;        // point cloud
 
   Eigen::Isometry3d _pose;
   boost::optional<Eigen::Vector4f> _floor_coeffes;
@@ -42,18 +43,19 @@ class KeyFrameSnapshot
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  typedef pcl::PointXYZRGB PointT;
   using Ptr=std::shared_ptr<KeyFrameSnapshot>;
   KeyFrameSnapshot(const KeyFrame::Ptr& key_frame):
     _cloud(key_frame->_cloud),
   _pose(key_frame->_node->estimate()){}
     //_cloud(key_frame->_cloud){}
  // _pose(key_frame->_node->estimate()){}
-  KeyFrameSnapshot(pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud,const Eigen::Isometry3d& pose):
+  KeyFrameSnapshot(pcl::PointCloud<PointT>::Ptr pointcloud,const Eigen::Isometry3d& pose):
     _cloud(pointcloud),
     _pose(pose)
   {}
  public:
-  pcl::PointCloud<pcl::PointXYZI>::ConstPtr _cloud;
+  pcl::PointCloud<PointT>::ConstPtr _cloud;
   Eigen::Isometry3d _pose;
 };
 }

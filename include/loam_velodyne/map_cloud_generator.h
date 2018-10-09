@@ -11,16 +11,17 @@ class MapCloudGenerate
 {
 public:
   using Ptr=std::shared_ptr<MapCloudGenerate>;
+  using PointT=pcl::PointXYZRGB;
   MapCloudGenerate()
   {
     _downSizeFilter.setLeafSize(0.4,0.4,0.4);
   }
 
-  pcl::PointCloud<pcl::PointXYZI>::Ptr generate(std::vector<KeyFrameSnapshot::Ptr> keyframes,double resolution,double distance,bool global)
+  pcl::PointCloud<PointT>::Ptr generate(std::vector<KeyFrameSnapshot::Ptr> keyframes,double resolution,double distance,bool global)
   {
     _downSizeFilter.setLeafSize(resolution,resolution,resolution);
     if(keyframes.empty()) return nullptr;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
+    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
     cloud->reserve(keyframes.front()->_cloud->size()*keyframes.size());
     Eigen::Isometry3d last_keyframe_pose=keyframes.back()->_pose;
     std::cout<<"map cloud size:"<<keyframes.front()->_cloud->size()<<std::endl;
@@ -34,7 +35,7 @@ public:
           continue;
       }
      // std::cout<<"pose"<<keyframe->_pose.matrix()<<std::endl;
-      pcl::PointCloud<pcl::PointXYZI>::Ptr keyframe_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+      pcl::PointCloud<PointT>::Ptr keyframe_cloud(new pcl::PointCloud<PointT>());
       keyframe_cloud->reserve(keyframe->_cloud->size());
       pcl::transformPointCloud(*(keyframe->_cloud),*(keyframe_cloud),keyframe->_pose.cast<float>());
       //pcl::transformPointCloud(*(keyframe->_cloud),*(keyframe_cloud),relative_pose);
@@ -43,7 +44,7 @@ public:
     cloud->width=cloud->size();
     cloud->height=1;
     cloud->is_dense=false;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
+    pcl::PointCloud<PointT>::Ptr filtered(new pcl::PointCloud<PointT>());
     filtered->reserve(cloud->size());
     _downSizeFilter.setInputCloud(cloud);
     _downSizeFilter.filter(*filtered);
@@ -61,7 +62,7 @@ public:
     return filtered;
   }
 private:
-  pcl::VoxelGrid<pcl::PointXYZI> _downSizeFilter;
+  pcl::VoxelGrid<PointT> _downSizeFilter;
 };
 }
 #endif // MAP_CLOUD_GENERATOR_H

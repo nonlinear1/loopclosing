@@ -10,7 +10,7 @@ namespace loam {
 class InformationMatrixCalculator {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  using PointT = pcl::PointXYZI;
+  using PointT = pcl::PointXYZRGB;
 
   InformationMatrixCalculator(ros::NodeHandle& nh);
   ~InformationMatrixCalculator();

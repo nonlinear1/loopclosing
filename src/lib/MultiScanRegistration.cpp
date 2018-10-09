@@ -156,6 +156,7 @@ void MultiScanRegistration::handleCloudMessage(const sensor_msgs::PointCloud2Con
 void MultiScanRegistration::process(const pcl::PointCloud<pcl::PointXYZI>& laserCloudIn,
                                     const ros::Time& scanTime)
 {
+ // std::cout<<"laserCloudIn"<<laserCloudIn.size()<<std::endl;
   clock_t begin = clock();
   size_t cloudSize = laserCloudIn.size();
 

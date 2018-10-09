@@ -213,7 +213,7 @@ private:
   tf::TransformBroadcaster _tfBroadcaster;  ///< mapping odometry transform broadcaster
 
   ros::Publisher _pubOdometry;
-  //ros::Publisher _pubLaserSubMapCloudSurrund;
+  ros::Publisher _pubLaserCloudSurround;
   //ros::Subscriber _subLaserCloudCornerLast;   ///< last corner cloud message subscriber
   //ros::Subscriber _subLaserCloudSurfLast;     ///< last surface cloud message subscriber
   //ros::Subscriber _subLaserCloudFullRes;      ///< full resolution cloud message subscriber

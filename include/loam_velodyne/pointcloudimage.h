@@ -57,6 +57,8 @@ public:
   std::unique_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry>> _syn;
   ros::Subscriber _sub_image;
 
+  //debug param
+  int view=0;
 };
 }
 #endif // POINTCLOUDIMAGE_H

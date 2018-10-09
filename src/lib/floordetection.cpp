@@ -144,7 +144,7 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr FloorDetection::normal_filtering(const pcl:
 
   pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
   ne.setKSearch(10);
-  ne.setViewPoint(0.0f, 0.0f, _sensor_height);
+  ne.setViewPoint(0.0f, _sensor_height,0.0f);
   ne.compute(*normals);
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>);

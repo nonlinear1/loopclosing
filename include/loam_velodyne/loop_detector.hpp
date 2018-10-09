@@ -113,10 +113,12 @@ private:
    * @param graph_slam           graph slam
    */
   Loop::Ptr matching(const std::vector<KeyFrame::Ptr>& candidate_keyframes, const KeyFrame::Ptr& new_keyframe) {
-    if(candidate_keyframes.empty()) {
+  /*  if(candidate_keyframes.empty()) {
       return nullptr;
     }
-    registration->setInputTarget(new_keyframe->_cloud);
+    pcl::PointCloud<PointT>::Ptr trans_cloud(new pcl::PointCloud<PointT>);
+    pcl::copyPointCloud(*(new_keyframe->_cloud),*trans_cloud);
+    registration->setInputTarget(trans_cloud);
     double best_score = std::numeric_limits<double>::max();
     KeyFrame::Ptr best_matched;
     Eigen::Matrix4d relative_pose;
@@ -130,7 +132,9 @@ private:
     pcl::PointCloud<PointT>::Ptr aligned(new pcl::PointCloud<PointT>());
     for(const auto& candidate : candidate_keyframes) {
       ros::Time clo_start=ros::Time::now();
-      registration->setInputSource(candidate->_cloud);
+      pcl::PointCloud<PointT>::Ptr trans_src_cloud(new pcl::PointCloud<PointT>);
+      pcl::copyPointCloud(*(candidate->_cloud),*trans_src_cloud);
+      registration->setInputSource(trans_src_cloud);
       Eigen::Matrix4f guess= (new_keyframe->_node->estimate().inverse() * candidate->_node->estimate()).matrix().cast<float>();
       guess(2, 3) = 0.0;
       registration->align(*aligned, guess);
@@ -160,7 +164,7 @@ private:
     std::cout << "relpose: " << relative_pose.block<3, 1>(0, 3) << " - " << Eigen::Quaterniond(relative_pose.block<3, 3>(0, 0)).coeffs().transpose() << std::endl;
 
     last_edge_accum_distance = new_keyframe->_accumulate_distance;
-    return std::make_shared<Loop>(new_keyframe, best_matched, relative_pose);
+    return std::make_shared<Loop>(new_keyframe, best_matched, relative_pose);*/
   }
 
 private:

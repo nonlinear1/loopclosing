@@ -15,7 +15,7 @@ namespace loam {
 class KeyframeUpdater {
 public:
 EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
+typedef pcl::PointXYZRGB PointT;
   KeyframeUpdater(ros::NodeHandle& pnh)
     : is_first(true),
       _prev_keypose(Eigen::Isometry3d::Identity()),
@@ -23,7 +23,7 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
       _keyframe_delta_angle(2.0),
       _keyframe_delta_time(2.0),
       _accum_distance(0),
-      _submap_cloud( new pcl::PointCloud<pcl::PointXYZI>()),
+      _submap_cloud( new pcl::PointCloud<PointT>()),
       _submap_flat_cloud( new pcl::PointCloud<pcl::PointXYZI>())
   {
      float fParam;
@@ -49,7 +49,7 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
    * @return  if true, the frame should be registered
    */
   bool update(const Eigen::Isometry3d& pose,ros::Time nowTime,
-              const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud,
+              const pcl::PointCloud<PointT>::Ptr& cloud,
               const pcl::PointCloud<pcl::PointXYZI>::Ptr& flat_cloud) {
     // first frame is always registered to the graph
     if(is_first) {
@@ -70,7 +70,7 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     // too close to the previous frame
     if(dx < _keyframe_delta_trans && da < _keyframe_delta_angle && delta_time<_keyframe_delta_time) {
-      pcl::PointCloud<pcl::PointXYZI>::Ptr transform_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+      pcl::PointCloud<PointT>::Ptr transform_cloud(new pcl::PointCloud<PointT>());
       transform_cloud->reserve(cloud->size());
       pcl::transformPointCloud(*(cloud),*(transform_cloud),delta.cast<float>());
       *_submap_cloud+=*transform_cloud;
@@ -108,7 +108,7 @@ ros::Time get_prev_time()
 {
   return _prev_time;
 }
-pcl::PointCloud<pcl::PointXYZI>::Ptr get_submap_cloud()
+pcl::PointCloud<PointT>::Ptr get_submap_cloud()
 {
   return _submap_cloud;
 }
@@ -128,10 +128,10 @@ private:
   double _accum_distance_buff;
   Eigen::Isometry3d _prev_keypose_buff;
   ros::Time _prev_time_buff;
-  pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_cloud_buff;
+  pcl::PointCloud<PointT>::Ptr _submap_cloud_buff;
   pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud_buff;
 private:
-  pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_cloud;
+  pcl::PointCloud<PointT>::Ptr _submap_cloud;
   pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud;
   Eigen::Isometry3d _prev_keypose;
   ros::Time _prev_time;
