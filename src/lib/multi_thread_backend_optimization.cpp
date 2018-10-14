@@ -10,6 +10,11 @@
 #include <g2o/types/slam3d/vertex_se3.h>
 #include <g2o/edge_se3_plane.hpp>
 #include<boost/filesystem.hpp>
+
+#include <iostream>
+#include<fstream>
+#include<sstream>
+#include<string>
 namespace loam {
 BackendOptimization::BackendOptimization():
   _max_keyframes_per_update(10),
@@ -29,7 +34,7 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
  _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",10.0);
  _graph_optimization_time_duration=private_nh.param<float>("graph_optimization_time_duration",3.0);
  _pub_map_pointcloud_time_duration=private_nh.param<float>("pub_map_pointcloud_time_duration",10.0);
- _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",10.0);
+ _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",0.1);
 
   _info_calculator.reset(new InformationMatrixCalculator(nh));
   _loop_detector.reset(new LoopDetector(nh));
@@ -133,6 +138,7 @@ bool BackendOptimization::flush_keyFrame_queue()
     //add se3 vertex to map
     //g2o::VertexSE3* pose_node= graph_slam->addVertexSE3(odom2map);
     g2o::VertexSE3* pose_node= graph_slam->add_se3_node(odom2map);
+
     keyFrame_ptr->_node=pose_node;
     _keyframe_hash[keyFrame_ptr->_stamp]=keyFrame_ptr;
     _new_keyFrames.push_back(keyFrame_ptr);
