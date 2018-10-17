@@ -22,7 +22,12 @@ public:
     _downSizeFilter.setLeafSize(resolution,resolution,resolution);
     if(keyframes.empty()) return nullptr;
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
-    cloud->reserve(keyframes.front()->_cloud->size()*keyframes.size());
+    int cloud_size=0;
+    for(int i=0;i<keyframes.size();i++)
+    {
+      cloud_size+=keyframes[i]->_cloud->size();
+    }
+    cloud->reserve(cloud_size);
     Eigen::Isometry3d last_keyframe_pose=keyframes.back()->_pose;
     std::cout<<"map cloud size:"<<keyframes.front()->_cloud->size()<<std::endl;
     for(KeyFrameSnapshot::Ptr keyframe:keyframes)

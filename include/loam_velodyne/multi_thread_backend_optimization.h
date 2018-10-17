@@ -45,6 +45,7 @@ public:
   bool save_map_cllback(loam_velodyne::SaveMapRequest& req,loam_velodyne::SaveMapResponse& res);
   bool mapvis_info_cllback(loam_velodyne::GlobalMapRequest& req,loam_velodyne::GlobalMapResponse& res);
   visualization_msgs::MarkerArray creat_trajectory(const ros::Time& stamp);
+  g2o::VertexPlane* select_global_plane_node(const Eigen::Isometry3d& pose_now,const Eigen::Vector4d& plane_now);
   //keyframe variable
   std::vector<std::shared_ptr<KeyFrame>> _keyFrames;
   std::vector<std::shared_ptr<KeyFrame>> _new_keyFrames;
@@ -101,6 +102,10 @@ public:
 
   //whether floor optim
   bool _is_floor_optim;
+  std::vector<g2o::VertexPlane*> _global_floor_plane_nodes;
+  std::vector<Eigen::Isometry3d> _global_floor_plane_pose;
+  double _floor_normal_thresh;
+  double _floor_distance_thresh;
 };
 }
 #endif // MULTI_THREAD_BACKEND_OPTIMIZATION_H

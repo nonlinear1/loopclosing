@@ -17,6 +17,8 @@ BackendOptimization::BackendOptimization():
   _graph_optimization_time_duration(3.0),
   _pub_map_pointcloud_time_duration(10.0),
   _accumulate_distance(0),
+  _floor_normal_thresh(8),
+  _floor_distance_thresh(1),
   _is_floor_optim(true)
 {
    _trans_odom2map=Eigen::Isometry3d::Identity();
@@ -27,11 +29,12 @@ BackendOptimization::BackendOptimization():
 bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
 {
   _max_keyframes_per_update=private_nh.param<int>("max_keyframes_per_update",10);
- _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",10.0);
+ _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",20.0);
  _graph_optimization_time_duration=private_nh.param<float>("graph_optimization_time_duration",3.0);
  _pub_map_pointcloud_time_duration=private_nh.param<float>("pub_map_pointcloud_time_duration",10.0);
- _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",10.0);
- _is_floor_optim=private_nh.param<bool>("floor_optim",false);
+ _is_floor_optim=private_nh.param<bool>("floor_optim",true);
+ _floor_normal_thresh=private_nh.param<float>("floor_normal_thresh",4);
+ _floor_distance_thresh=private_nh.param<float>("floor_distance_thresh",0.002);
 
  _keyframe_update.reset(new KeyframeUpdater(private_nh));
  _floor_detecter.reset(new FloorDetection());
@@ -41,8 +44,8 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
    _loop_detector.reset(new LoopDetector(nh));
    graph_slam.reset(new GraphSLAM());
    _map_generate.reset(new MapCloudGenerate());
-  _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/velodyne_cloud_registered",2));
-  _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
+  _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/rgb_points_cloud",2));
+  _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/rgb_points_cloud_odom",2));
   _sub_flat_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_flat_cloud_2",2));
 
   _time_syn.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry,
@@ -59,6 +62,7 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
   _map_info_server=nh.advertiseService("/setup_map",&BackendOptimization::mapvis_info_cllback,this);
   _vis_pub=nh.advertise<visualization_msgs::MarkerArray>("/markers",2);
   _vis_odom_pub=nh.advertise<visualization_msgs::Marker>("/odom_marker",2);
+  return true;
 }
 void BackendOptimization::BackendOptimization::process(){}
 void BackendOptimization::spin()
@@ -77,6 +81,7 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
 {
   pcl::PointCloud<PointT>::Ptr laser_pointcloud(new pcl::PointCloud<PointT>());
   pcl::fromROSMsg(*cloud, *laser_pointcloud);
+  //std::cout<<"rgb size"<<laser_pointcloud->size()<<std::endl;
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr laser_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>());
   pcl::fromROSMsg(*flat,*laser_flat_cloud);
@@ -87,7 +92,8 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
 
   pose.rotate(eig_qua.toRotationMatrix());
   pose.pretranslate(Eigen::Vector3d(odom->pose.pose.position.x,odom->pose.pose.position.y,odom->pose.pose.position.z));
- // std::cout<<"pose"<<pose.matrix()<<std::endl;
+  Eigen::Isometry3d vis_pose=_trans_odom2map*pose;
+  // std::cout<<"pose"<<pose.matrix()<<std::endl;
   //publish now odometry
   visualization_msgs::Marker sphere_marker;
   sphere_marker.header.frame_id = "/camera_init";
@@ -95,7 +101,7 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   sphere_marker.ns = "odometry";
   sphere_marker.id = 0;
   sphere_marker.type = visualization_msgs::Marker::SPHERE;
-  Eigen::Vector3d pos = pose.translation();
+  Eigen::Vector3d pos = vis_pose.translation();
   sphere_marker.pose.position.x = pos(0);
   sphere_marker.pose.position.y = pos(1);
   sphere_marker.pose.position.z = pos(2);
@@ -115,6 +121,7 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   std::shared_ptr<KeyFrame> key_frame(new KeyFrame());
   key_frame->_pose=_keyframe_update->get_prev_pose();
   key_frame->_accumulate_distance=_keyframe_update->get_accum_distance();
+  //std::cout<<"accumulate distance:"<<key_frame->_accumulate_distance<<std::endl;
   key_frame->_stamp=_keyframe_update->get_prev_time();
   key_frame->_cloud=_keyframe_update->get_submap_cloud();
   if(_is_floor_optim)
@@ -146,8 +153,11 @@ bool BackendOptimization::flush_keyFrame_queue()
     {
       Eigen::Vector4d floor_coeff((*(keyFrame_ptr->_floor_coeffes))[0],(*(keyFrame_ptr->_floor_coeffes))[1],
                                   (*(keyFrame_ptr->_floor_coeffes))[2],(*(keyFrame_ptr->_floor_coeffes))[3]);
+
+      g2o::VertexPlane* keyframe_plane_nod=select_global_plane_node(odom2map,floor_coeff);
       Eigen::Matrix3d information = Eigen::Matrix3d::Identity() * (1.0 / _floor_edge_stddev);
-      graph_slam->add_se3_plane_edge(keyFrame_ptr->_node,graph_slam->floor_plane_node,floor_coeff,information);
+//      graph_slam->add_se3_plane_edge(keyFrame_ptr->_node,keyframe_plane_nod,floor_coeff,information);
+      std::cout<<"_global_floor_plane_nodes"<<_global_floor_plane_nodes.size()<<std::endl;
     }
     //add floor detection
     _keyframe_hash[keyFrame_ptr->_stamp]=keyFrame_ptr;
@@ -167,6 +177,60 @@ bool BackendOptimization::flush_keyFrame_queue()
   _deque_KeyFrames.erase(_deque_KeyFrames.begin(),_deque_KeyFrames.begin()+add_frame_num);
  return true;
 }
+g2o::VertexPlane* BackendOptimization::select_global_plane_node(const Eigen::Isometry3d& pose_now, const Eigen::Vector4d& plane_now)
+{
+  Eigen::Vector4d floor_word;
+  Eigen::Matrix3d R=pose_now.rotation();
+  floor_word.head<3>() = R*plane_now.head<3>();
+  floor_word(3)=plane_now(3) - pose_now.translation().dot(floor_word.head<3>());
+  g2o::VertexPlane* floor_plane_node = graph_slam->add_plane_node(floor_word);
+  floor_plane_node->setFixed(true);
+  //std::cout<<"floor before:"<<plane_now(0)<<plane_now(1)<<plane_now(2)<<plane_now(3)<<std::endl;
+  //std::cout<<"floor aft:"<<floor_word(0)<<floor_word(1)<<floor_word(2)<<floor_word(3)<<std::endl;
+  /*if(_global_floor_plane_nodes.size()==0)
+  {
+    g2o::VertexPlane* floor_plane_node = graph_slam->add_plane_node(floor_word);
+    floor_plane_node->setFixed(true);
+    _global_floor_plane_nodes.push_back(floor_plane_node);
+    _global_floor_plane_pose.push_back(pose_now);
+    return floor_plane_node;
+  }
+  else
+  {
+    g2o::VertexPlane* floor_plane_node;
+    double min_score=std::numeric_limits<double>::max();
+    bool is_add_plane=false;
+    for(int g_id=0;g_id<_global_floor_plane_nodes.size();g_id++)
+    {
+      Eigen::Vector4d global_floor_coeffes=_global_floor_plane_nodes[g_id]->estimate()._coeffs;
+      Eigen::Isometry3d pose_prev=_global_floor_plane_pose[g_id];
+      Eigen::Isometry3d delta = pose_prev.inverse() * pose_now;
+      double dx = std::abs(delta.translation().norm());
+      double dot = global_floor_coeffes.head<3>().dot(floor_word.head<3>());
+      double distance_diff=std::abs(global_floor_coeffes(3)-floor_word(3));
+     // std::cout<<"dot"<<dot<<"distence_diff"<<distance_diff<<std::endl;
+      if(std::abs(dot) > std::cos(_floor_normal_thresh * M_PI / 180.0) && distance_diff<_floor_distance_thresh &&dx<1)
+      {
+         is_add_plane=true;
+         double all_error=std::abs(dot)+distance_diff;
+         if(all_error<min_score)
+         {
+            all_error=min_score;
+            floor_plane_node=_global_floor_plane_nodes[g_id];
+         }
+      }
+    }
+    if(is_add_plane==false)
+    {
+       floor_plane_node = graph_slam->add_plane_node(floor_word);
+       floor_plane_node->setFixed(true);
+       _global_floor_plane_nodes.push_back(floor_plane_node);
+       _global_floor_plane_pose.push_back(pose_now);
+    }
+    return floor_plane_node;
+  }*/
+}
+
 /*void BackendOptimization::laser_floor_coeffs_callback(const loam_velodyne::FloorCoeffsConstPtr& floor)
 {
   if(floor->coeffs.empty()) return;
@@ -209,10 +273,11 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
 //  if(!flush_keyFrame_queue() & !flush_floor_queue())
   if(!flush_keyFrame_queue())
   {
+    std::cout<<"graph return"<<std::endl;
     return;
   }
   ros::Time start_loop=ros::Time::now();
-/*  std::vector<Loop::Ptr> detect_loops=_loop_detector->detect(_keyFrames,_new_keyFrames);
+ std::vector<Loop::Ptr> detect_loops=_loop_detector->detect(_keyFrames,_new_keyFrames);
   for(int i=0;i<detect_loops.size();i++)
   {
     Loop::Ptr loop=detect_loops[i];
@@ -220,14 +285,14 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
     Eigen::MatrixXd infomation= _info_calculator->calc_information_matrix(loop->key1->_cloud,loop->key2->_cloud,relative_pose);
     //graph_slam->addEdgeSE3(loop->key1->_node,loop->key2->_node,relative_pose,infomation);
     graph_slam->add_se3_edge(loop->key1->_node,loop->key2->_node,relative_pose,infomation);
-  }*/
+  }
   std::cout<<"loop closure using time is:"<<(ros::Time::now()-start_loop).toSec()*1000<<"ms"<<std::endl;
-  //graph_slam->optimization();
-//  graph_slam->optimize();
+  graph_slam->optimize();
   std::copy(_new_keyFrames.begin(),_new_keyFrames.end(),std::back_inserter(_keyFrames));
   _new_keyFrames.clear();
   KeyFrame::Ptr last_key_frame= _keyFrames.back();
   _trans_odom2map=last_key_frame->_node->estimate()*last_key_frame->_pose.inverse();
+  //std::cout<<"_trans_odom2map"<<_trans_odom2map.matrix()<<std::endl;
   std::vector<KeyFrameSnapshot::Ptr> snapshot(_keyFrames.size());
   std::transform(_keyFrames.begin(),_keyFrames.end(),snapshot.begin(),[](KeyFrame::Ptr key_frame)
   {
@@ -249,7 +314,6 @@ void BackendOptimization::pub_map_pointcloud_timer_callback(const ros::TimerEven
   _snapshot_cloud_mutex.lock();
   snapshot=_snapshot_cloud;
   _snapshot_cloud_mutex.unlock();
-
   ros::Time start=ros::Time::now();
   pcl::PointCloud<PointT>::Ptr cloud=_map_generate->generate(snapshot,_display_resolution,_display_distance_threash,_is_global_map);
   if(!cloud)
@@ -257,6 +321,7 @@ void BackendOptimization::pub_map_pointcloud_timer_callback(const ros::TimerEven
     std::cout<<"cloud is empty"<<std::endl;
     return ;
   }
+  std::cout<<"map size"<<cloud->size()<<std::endl;
   std::cout<<"publish map time:"<<(ros::Time::now()-start).toSec()*1000<<"ms"<<std::endl;
   cloud->header.stamp=snapshot.back()->_cloud->header.stamp;
   cloud->header=snapshot.back()->_cloud->header;

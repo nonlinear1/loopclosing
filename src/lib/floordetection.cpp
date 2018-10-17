@@ -87,7 +87,7 @@ boost::optional<Eigen::Vector4f> FloorDetection::detect(const pcl::PointCloud<pc
   // RANSAC
   pcl::SampleConsensusModelPlane<pcl::PointXYZI>::Ptr model_p(new pcl::SampleConsensusModelPlane<pcl::PointXYZI>(filtered));
   pcl::RandomSampleConsensus<pcl::PointXYZI> ransac(model_p);
-  ransac.setDistanceThreshold(0.1);
+  ransac.setDistanceThreshold(0.05);
   ransac.computeModel();
 
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);

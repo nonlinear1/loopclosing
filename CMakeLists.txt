@@ -95,8 +95,6 @@ target_link_libraries(transformMaintenance ${catkin_LIBRARIES} ${PCL_LIBRARIES} 
 
 add_executable(laserImage_node src/laser_image_node.cpp)
 target_link_libraries(laserImage_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
-add_executable(optim_node src/optim_node.cpp)
-target_link_libraries(optim_node ${catkin_LIBRARIES} loam )
 #add_executable(floorDetection src/floor_detection_node.cpp)
 #target_link_libraries(floorDetection ${catkin_LIBRARIES} ${PCL_LIBRARIES} loam )
 

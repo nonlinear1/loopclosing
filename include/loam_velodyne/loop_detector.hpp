@@ -95,11 +95,15 @@ private:
       const auto& pos2 = new_keyframe->_node->estimate().translation();
 
       // estimated distance between keyframes is too small
-      double dist = (pos1.head<2>() - pos2.head<2>()).norm();
+      double dist=std::sqrt(std::pow(pos1(0)-pos2(0),2)+std::pow(pos1(2)-pos2(2),2));
+      //double dist = (pos1.head<2>() - pos2.head<2>()).norm();
       if(dist > distance_thresh) {
         continue;
       }
-
+      //std::cout<<"accum distance diff:"<<new_keyframe->_accumulate_distance - k->_accumulate_distance<<std::endl;
+      //std::cout<<"distance diff:"<<dist<<std::endl;
+      //std::cout<<"accum dis1:"<<new_keyframe->_accumulate_distance<<std::endl;
+      //std::cout<<"accum dis2:"<<k->_accumulate_distance<<std::endl;
       candidates.push_back(k);
     }
 
@@ -113,7 +117,7 @@ private:
    * @param graph_slam           graph slam
    */
   Loop::Ptr matching(const std::vector<KeyFrame::Ptr>& candidate_keyframes, const KeyFrame::Ptr& new_keyframe) {
-  /*  if(candidate_keyframes.empty()) {
+    if(candidate_keyframes.empty()) {
       return nullptr;
     }
     pcl::PointCloud<PointT>::Ptr trans_cloud(new pcl::PointCloud<PointT>);
@@ -164,7 +168,7 @@ private:
     std::cout << "relpose: " << relative_pose.block<3, 1>(0, 3) << " - " << Eigen::Quaterniond(relative_pose.block<3, 3>(0, 0)).coeffs().transpose() << std::endl;
 
     last_edge_accum_distance = new_keyframe->_accumulate_distance;
-    return std::make_shared<Loop>(new_keyframe, best_matched, relative_pose);*/
+    return std::make_shared<Loop>(new_keyframe, best_matched, relative_pose);
   }
 
 private:
