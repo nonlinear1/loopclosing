@@ -10,7 +10,7 @@
 #include <pcl/common/transforms.h>
 #include"keyframe.hpp"
 #include <nav_msgs/Odometry.h>
-#include"Twist.h"
+//#include"Twist.h"
 namespace loam {
 class KeyframeUpdater {
 public:
@@ -31,11 +31,11 @@ typedef pcl::PointXYZRGB PointT;
      {
          _keyframe_delta_trans=fParam;
      }
-     if(pnh.getParam("keyframe_delta_trans",fParam))
+     if(pnh.getParam("keyframe_delta_angle",fParam))
      {
          _keyframe_delta_angle=fParam;
      }
-     if(pnh.getParam("keyframe_delta_angle",fParam))
+     if(pnh.getParam("keyframe_delta_time",fParam))
      {
          _keyframe_delta_time=fParam;
      }

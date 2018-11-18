@@ -31,7 +31,7 @@ bool PointCloudImage::setup(ros::NodeHandle& nh,ros::NodeHandle& private_nh)
     _vec_pose_image[i].reserve(10);
     _images_bufffer[i].ensureCapacity(50);
   }
-  //_sub_pointscloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/velodyne_cloud_registered",2));
+  //_sub_pointscloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_cloud_surround",2));
   _sub_pointscloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_cloud_surround",2));
   _sub_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
   _syn.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry>(*_sub_pointscloud,*_sub_odom,2));
@@ -307,7 +307,6 @@ void PointCloudImage::publishResult()
       laserOdometry.pose.pose.position.y = _vec_pointcloud[i]._t(1);
       laserOdometry.pose.pose.position.z = _vec_pointcloud[i]._t(2);
       _pub_odom.publish(laserOdometry);
-
     }
   }
   _vec_pointcloud.erase(_vec_pointcloud.begin(),_vec_pointcloud.begin()+erase_index+1);

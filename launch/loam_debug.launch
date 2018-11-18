@@ -1,0 +1,61 @@
+<launch>
+
+  <arg name="rviz" default="true" />
+  <arg name="scanPeriod" default="0.1" />
+  <node pkg="tf" type="static_transform_publisher" name="camera_init_to_map" args="0 0 0 1.570795 0 1.570795 /map /camera_init 10" />
+  <node pkg="tf" type="static_transform_publisher" name="base_link_to_camera" args="0 0 0 -1.570795 -1.570795 0 /camera /base_link 10" />
+  <node pkg="loam_velodyne" type="imageProjection" name="imageProjection" output="screen">
+    <param name="lidar" value="VLP-16" /> <!-- options: VLP-16  HDL-32  HDL-64E -->
+    <param name="scanPeriod" value="$(arg scanPeriod)" />
+    <remap from="/lslidar_point_cloud" to="/lslidar_point_cloud" />
+  </node>
+
+  <node pkg="loam_velodyne" type="featureAssociation" name="featureAssociation" output="screen" respawn="true">
+    <param name="scanPeriod" value="$(arg scanPeriod)" />
+  </node>
+   <node pkg="loam_velodyne" type="mapOptmization" name="mapOptmization" output="screen">
+    <param name="camera_number" value="1" />
+  </node>
+  <node pkg="loam_velodyne" type="transformFusion" name="transformFusion" output="screen">
+    <param name="camera_number" value="1" />
+  </node>
+   <node pkg="loam_velodyne" type="laserImage_node" name="laserImage_node" output="screen">
+    <param name="camera_number" value="1" />
+  </node>
+  <node pkg="loam_velodyne" type="backendOptim" name="backendOptim" output="screen">
+    <!-- if calMethod is distribution,then the calculating pose is
+    distribution method,if calmethod is center,the calculating
+    method is center-->
+    <param name="carId" value="master" />
+    <param name="calMethod" value="center" />
+    <!-- keyframe registration params -->
+    <param name="max_keyframes_per_update" value="10" />
+    <param name="keyframe_delta_trans" value="2" />
+    <param name="keyframe_delta_angle" value="2" />
+    <param name="keyframe_delta_time" value="2" />
+    <!-- loop closure params -->
+    <param name="distance_thresh" value="5.0" />
+    <param name="child_master_distance_thresh" value="1.0" />
+    <param name="accum_distance_thresh" value="8.0" />
+    <param name="min_edge_interval" value="5.0" />
+    <param name="fitness_score_thresh" value="0.5" />
+    <!-- cloud matching params -->
+    <param name="registration_method" value="NDT_OMP" />
+    <param name="ndt_resolution" value="1.0" />
+    <param name="ndt_num_threads" value="0" />
+    <param name="ndt_nn_search_method" value="DIRECT7" />
+    <!-- information matrix params -->
+    <param name="gps_edge_stddev" value="1000.0" />
+    <param name="floor_edge_stddev" value="20.0" />
+    <!-- update params -->
+    <param name="graph_update_interval" value="3.0" />
+    <param name="map_cloud_update_interval" value="10.0" />
+    <!--compress cloud -->
+    <param name="compressCloud" value="low" />
+  </node>
+
+  <group if="$(arg rviz)">
+    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find loam_velodyne)/rviz_cfg/loam_loop.rviz" />
+  </group>
+
+</launch>
