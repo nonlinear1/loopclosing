@@ -10,19 +10,11 @@
 #include <g2o/types/slam3d/vertex_se3.h>
 #include <g2o/edge_se3_plane.hpp>
 #include<boost/filesystem.hpp>
-<<<<<<< HEAD
-
-#include <iostream>
-#include<fstream>
-#include<sstream>
-#include<string>
-=======
 #include<std_msgs/String.h>
 #include<boost/lexical_cast.hpp>
 #include<sensor_msgs/CompressedImage.h>
 #include<std_msgs/ByteMultiArray.h>
 #include<std_msgs/Byte.h>
->>>>>>> image
 namespace loam {
 Options::Options()
     : is_point_cloud(true),
@@ -78,12 +70,6 @@ BackendOptimization::BackendOptimization():
 bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
 {
   _max_keyframes_per_update=private_nh.param<int>("max_keyframes_per_update",10);
-<<<<<<< HEAD
- _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",10.0);
- _graph_optimization_time_duration=private_nh.param<float>("graph_optimization_time_duration",3.0);
- _pub_map_pointcloud_time_duration=private_nh.param<float>("pub_map_pointcloud_time_duration",10.0);
- _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",0.1);
-=======
  _floor_edge_stddev=private_nh.param<float>("floor_edge_stddev",20.0);
  _map_cloud_update_interval=private_nh.param<float>("map_cloud_update_interval",10.0);
  _graph_update_interval=private_nh.param<float>("graph_update_interval",3.0);
@@ -111,7 +97,6 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
 
  // pointCloudEncoder.reset(new pcl::io::OctreePointCloudCompression<PointT>(profile,false));
  // pointCloudDecoder.reset(new pcl::io::OctreePointCloudCompression<PointT>());
->>>>>>> image
 
   _info_calculator.reset(new InformationMatrixCalculator(nh));
   _loop_detector.reset(new LoopDetector(nh,false));
@@ -984,7 +969,6 @@ bool BackendOptimization::flush_keyFrame_queue()
     Eigen::Isometry3d odom2map= _trans_odom2map*keyFrame_ptr->_pose;
     //add se3 vertex to map
     g2o::VertexSE3* pose_node= graph_slam->add_se3_node(odom2map);
-
     keyFrame_ptr->_node=pose_node;
     if(keyFrame_ptr->_floor_coeffes)
     {
@@ -1090,7 +1074,7 @@ bool BackendOptimization::flush_floor_queue()
     Eigen::Vector4d floor_coeff(floor_coeffs->coeffs[0],floor_coeffs->coeffs[1],floor_coeffs->coeffs[2],floor_coeffs->coeffs[3]);
     Eigen::Matrix3d information = Eigen::Matrix3d::Identity() * (1.0 / _floor_edge_stddev);
 //    graph_slam->addEdgeSE3Plane(keyframe->_node,floor_coeff,information);
-//    graph_slam->add_se3_plane_edge(keyframe->_node,graph_slam->floor_plane_node,floor_coeff,information);
+    graph_slam->add_se3_plane_edge(keyframe->_node,graph_slam->floor_plane_node,floor_coeff,information);
     updated=true;
   }
   auto remove_loc=std::upper_bound(_deque_floor.begin(),_deque_floor.end(),last_keyframe_stamp,[](ros::Time value,loam_velodyne::FloorCoeffsConstPtr floor)
@@ -1108,22 +1092,6 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
     std::cout<<"graph empty"<<std::endl;
     return;
   }
-<<<<<<< HEAD
-  ros::Time start_loop=ros::Time::now();
-  std::vector<Loop::Ptr> detect_loops=_loop_detector->detect(_keyFrames,_new_keyFrames);
- /* for(int i=0;i<detect_loops.size();i++)
-  {
-    Loop::Ptr loop=detect_loops[i];
-    Eigen::Isometry3d relative_pose(loop->relative_pose);
-    Eigen::MatrixXd infomation= _info_calculator->calc_information_matrix(loop->key1->_cloud,loop->key2->_cloud,relative_pose);
-    //graph_slam->addEdgeSE3(loop->key1->_node,loop->key2->_node,relative_pose,infomation);
-    graph_slam->add_se3_edge(loop->key1->_node,loop->key2->_node,relative_pose,infomation);
-  }*/
-  std::cout<<"loop closure using time is:"<<(ros::Time::now()-start_loop).toSec()*1000<<"ms"<<std::endl;
-  //graph_slam->optimization();
-//  graph_slam->optimize();
-  std::copy(_new_keyFrames.begin(),_new_keyFrames.end(),std::back_inserter(_keyFrames));
-=======
   if(_carId=="master" || _calMethod=="distribution")
   {
     std::transform(_keyFrames.begin(),_keyFrames.end(),_keyFrames.begin(),[](KeyFrame::Ptr key_frame)
@@ -1214,7 +1182,6 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
         _receivedKeyFrames[i]->_node->setEstimate(foundKeyframe->_pose);
       }
   }
->>>>>>> image
   _new_keyFrames.clear();
   _newReceivedKeyFrames.clear();
   std::vector<KeyFrameSnapshot::Ptr> snapshot(_keyFrames.size()+_receivedKeyFrames.size());//+_receivedKeyFrames.size()
