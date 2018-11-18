@@ -1,17 +1,17 @@
 #include <ros/ros.h>
-#include "loam_velodyne/TransformMaintenance.h"
+#include "loam_velodyne/pointcloudimage.h"
 
 
 /** Main node entry point. */
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "transformMaintenance");
+  ros::init(argc, argv, "laserImage");
   ros::NodeHandle node;
   ros::NodeHandle privateNode("~");
 
-  loam::TransformMaintenance transMaintenance;
+  loam::PointCloudImage laserImage;
 
-  if (transMaintenance.setup(node, privateNode)) {
+  if (laserImage.setup(node, privateNode)) {
     // initialization successful
     ros::spin();
   }

@@ -152,6 +152,7 @@ void GraphSLAM::optimize() {
 
   double chi2 = graph->chi2();
 
+<<<<<<< HEAD
 //  auto t1 = ros::Time::now();
   int iterations = graph->optimize(50);
 
@@ -160,6 +161,16 @@ void GraphSLAM::optimize() {
   std::cout << "iterations: " << iterations << std::endl;
   std::cout << "chi2: (before)" << chi2 << " -> (after)" << graph->chi2() << std::endl;
  // std::cout << "time: " << boost::format("%.3f") % (t2 - t1).toSec() << "[sec]" << std::endl;
+=======
+  //auto t1 = ros::Time::now();
+  int iterations = graph->optimize(50);
+
+  //auto t2 = ros::Time::now();
+  std::cout << "done" << std::endl;
+  std::cout << "iterations: " << iterations << std::endl;
+  std::cout << "chi2: (before)" << chi2 << " -> (after)" << graph->chi2() << std::endl;
+  //std::cout << "time: " << boost::format("%.3f") % (t2 - t1).toSec() << "[sec]" << std::endl;
+>>>>>>> image
 }
 
 void GraphSLAM::save(const std::string& filename) {

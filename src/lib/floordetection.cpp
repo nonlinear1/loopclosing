@@ -18,8 +18,8 @@ FloorDetection::FloorDetection(const float& sensor_height,
 
 {
 }
-bool FloorDetection::setup(ros::NodeHandle nh,
-                           ros::NodeHandle privateNode)
+bool FloorDetection::setup(ros::NodeHandle& nh,
+                           ros::NodeHandle& privateNode)
 {
   bool bparam;
   int iparam;
@@ -48,15 +48,15 @@ bool FloorDetection::setup(ros::NodeHandle nh,
   {
     _normal_filter_thresh=fparam;
   }
-  _sub_SubmapFlatCloud=nh.subscribe<sensor_msgs::PointCloud2>("/laser_submap_flatcloud",2,&FloorDetection::cloud_callback,this);
-  _pub_floor=nh.advertise<loam_velodyne::FloorCoeffs>("/laser_cloud_normal",2);
+  //_sub_SubmapFlatCloud=nh.subscribe<sensor_msgs::PointCloud2>("/laser_submap_flatcloud",2,&FloorDetection::cloud_callback,this);
+ // _pub_floor=nh.advertise<loam_velodyne::FloorCoeffs>("/laser_cloud_normal",2);
   return true;
 }
-void FloorDetection::spin()
+/*void FloorDetection::spin()
 {
   ros::spin();
-}
-void FloorDetection::cloud_callback(const sensor_msgs::PointCloud2ConstPtr& laserCloudSurfMsg)
+}*/
+/*void FloorDetection::cloud_callback(const sensor_msgs::PointCloud2ConstPtr& laserCloudSurfMsg)
 {
   _laser_cloud_stamp=laserCloudSurfMsg->header.stamp;
   _laser_surf_cloud->clear();
@@ -65,7 +65,7 @@ void FloorDetection::cloud_callback(const sensor_msgs::PointCloud2ConstPtr& lase
   boost::optional<Eigen::Vector4f> floor=detect(_laser_surf_cloud);
   publishResult(floor);
   //std::cout<<"floor time:"<<(ros::Time::now()-start).toSec()*1000<<"ms"<<std::endl;
-}
+}*/
 boost::optional<Eigen::Vector4f> FloorDetection::detect(const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud)
 {
   // compensate the tilt rotation
@@ -87,7 +87,7 @@ boost::optional<Eigen::Vector4f> FloorDetection::detect(const pcl::PointCloud<pc
   // RANSAC
   pcl::SampleConsensusModelPlane<pcl::PointXYZI>::Ptr model_p(new pcl::SampleConsensusModelPlane<pcl::PointXYZI>(filtered));
   pcl::RandomSampleConsensus<pcl::PointXYZI> ransac(model_p);
-  ransac.setDistanceThreshold(0.1);
+  ransac.setDistanceThreshold(0.05);
   ransac.computeModel();
 
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
@@ -144,7 +144,7 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr FloorDetection::normal_filtering(const pcl:
 
   pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
   ne.setKSearch(10);
-  ne.setViewPoint(0.0f, 0.0f, _sensor_height);
+  ne.setViewPoint(0.0f, _sensor_height,0.0f);
   ne.compute(*normals);
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>);
@@ -163,7 +163,7 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr FloorDetection::normal_filtering(const pcl:
 
   return filtered;
 }
-void FloorDetection::publishResult(boost::optional<Eigen::Vector4f> floor)
+/*void FloorDetection::publishResult(boost::optional<Eigen::Vector4f> floor)
 {
     loam_velodyne::FloorCoeffs floorCoeff;
     floorCoeff.header.stamp = _laser_cloud_stamp;
@@ -174,5 +174,5 @@ void FloorDetection::publishResult(boost::optional<Eigen::Vector4f> floor)
       }
     }
     _pub_floor.publish(floorCoeff);
-}
+}*/
 }

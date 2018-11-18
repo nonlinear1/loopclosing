@@ -10,109 +10,132 @@
 #include <pcl/common/transforms.h>
 #include"keyframe.hpp"
 #include <nav_msgs/Odometry.h>
-#include"Twist.h"
+//#include"Twist.h"
 namespace loam {
 class KeyframeUpdater {
 public:
 EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
+typedef pcl::PointXYZRGB PointT;
   KeyframeUpdater(ros::NodeHandle& pnh)
     : is_first(true),
       _prev_keypose(Eigen::Isometry3d::Identity()),
-      _keyframeDeltaTrans(2.0),
-      _keyframeDeltaAngle(2.0),
-      _keyframeDeltaTime(2.0)
+      _keyframe_delta_trans(2.0),
+      _keyframe_delta_angle(2.0),
+      _keyframe_delta_time(2.0),
+      _accum_distance(0),
+      _submap_cloud( new pcl::PointCloud<PointT>()),
+      _submap_flat_cloud( new pcl::PointCloud<pcl::PointXYZI>())
   {
      float fParam;
      if(pnh.getParam("keyframe_delta_trans",fParam))
      {
-         _keyframeDeltaTrans=fParam;
-     }
-     if(pnh.getParam("keyframe_delta_trans",fParam))
-     {
-         _keyframeDeltaAngle=fParam;
+         _keyframe_delta_trans=fParam;
      }
      if(pnh.getParam("keyframe_delta_angle",fParam))
      {
-         _keyframeDeltaTime=fParam;
+         _keyframe_delta_angle=fParam;
      }
-    _keyFramePtr.reset(new KeyFrame());
+     if(pnh.getParam("keyframe_delta_time",fParam))
+     {
+         _keyframe_delta_time=fParam;
+     }
+    _kefFrame_ptr.reset(new KeyFrame());
 
   }
-  nav_msgs::Odometry poseToodometry(const Eigen::Isometry3d& pose,ros::Time nowTime)
-  {
-       Eigen::Quaterniond qRelativePose(pose.rotation());
-       Eigen::Vector3d translate=pose.translation();
-       nav_msgs::Odometry laserRelativeOdometry;
-       laserRelativeOdometry.header.stamp = nowTime;
-       laserRelativeOdometry.pose.pose.orientation.x = qRelativePose.x();
-       laserRelativeOdometry.pose.pose.orientation.y = qRelativePose.y();
-       laserRelativeOdometry.pose.pose.orientation.z = qRelativePose.z();
-       laserRelativeOdometry.pose.pose.orientation.w = qRelativePose.w();
-       laserRelativeOdometry.pose.pose.position.x = translate(0);
-       laserRelativeOdometry.pose.pose.position.y = translate(1);
-       laserRelativeOdometry.pose.pose.position.z = translate(2);
 
-       return laserRelativeOdometry;
-  }
   /**
    * @brief decide if a new frame should be registered to the graph
    * @param pose  pose of the frame
    * @return  if true, the frame should be registered
    */
-  bool update(const Eigen::Isometry3d& pose,ros::Time nowTime,const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& submapPointCloud,
-              const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& submapFlatCloud) {
+  bool update(const Eigen::Isometry3d& pose,ros::Time nowTime,
+              const pcl::PointCloud<PointT>::Ptr& cloud,
+              const pcl::PointCloud<pcl::PointXYZI>::Ptr& flat_cloud) {
     // first frame is always registered to the graph
     if(is_first) {
       is_first = false;
       _prev_keypose = pose;
-      nav_msgs::Odometry relativeOdometry=poseToodometry(Eigen::Isometry3d::Identity(),nowTime);
-      _keyFramePtr->_odom.push_back(relativeOdometry);
       _prev_time=nowTime;
+      _accum_distance=0;
+      *_submap_cloud+=*cloud;
+      *_submap_flat_cloud+=*flat_cloud;
       return false;
     }
 
     // calculate the delta transformation from the previous keyframe
     Eigen::Isometry3d delta = _prev_keypose.inverse() * pose;
-    nav_msgs::Odometry relativeOdometry=poseToodometry(delta,nowTime);
     float delta_time=nowTime.toSec()-_prev_time.toSec();
-    double dx = delta.translation().norm();
-    double da = std::acos(Eigen::Quaterniond(delta.linear()).w());
+    double dx = std::abs(delta.translation().norm());
+    double da = std::abs(std::acos(Eigen::Quaterniond(delta.linear()).w()));
 
     // too close to the previous frame
-    if(dx > _keyframeDeltaTrans || da > _keyframeDeltaAngle || delta_time>_keyframeDeltaTime) {
+    if(dx < _keyframe_delta_trans && da < _keyframe_delta_angle && delta_time<_keyframe_delta_time) {
+      pcl::PointCloud<PointT>::Ptr transform_cloud(new pcl::PointCloud<PointT>());
+      transform_cloud->reserve(cloud->size());
+      pcl::transformPointCloud(*(cloud),*(transform_cloud),delta.cast<float>());
+      *_submap_cloud+=*transform_cloud;
 
-      pcl::PointCloud<pcl::PointXYZI>::Ptr keyframe_cloud(new pcl::PointCloud<pcl::PointXYZI>());
-      keyframe_cloud->reserve(submapPointCloud->size());
-      pcl::transformPointCloud(*(submapPointCloud),*(keyframe_cloud),_prev_keypose.inverse().cast<float>());
-      //std::cout<<"_prev_keypose"<<_prev_keypose.matrix()<<std::endl;
-      _keyFramePtr->_cloud=keyframe_cloud;
-      pcl::PointCloud<pcl::PointXYZI>::Ptr keyframe_cloud_flat(new pcl::PointCloud<pcl::PointXYZI>());
-      keyframe_cloud_flat->reserve(submapFlatCloud->size());
-      pcl::transformPointCloud(*(submapFlatCloud),*(keyframe_cloud_flat),_prev_keypose.inverse().cast<float>());
-      _keyFramePtr->_flat_cloud=keyframe_cloud_flat;
-      _keyFramePtr->_stamp=_prev_time;
-       nav_msgs::Odometry submapPose=poseToodometry(_prev_keypose,_prev_time);
-      _keyFramePtr->pose=submapPose;
-      _prev_keypose = pose;
-      _prev_time=nowTime;
-
-      return true;
+      pcl::PointCloud<pcl::PointXYZI>::Ptr transform_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+      transform_flat_cloud->reserve(flat_cloud->size());
+      pcl::transformPointCloud(*flat_cloud,*transform_flat_cloud,delta.cast<float>());
+      *_submap_flat_cloud+=*transform_flat_cloud;
+      return false;
     }
-    _keyFramePtr->_odom.push_back(relativeOdometry);
-    return false;
+    _accum_distance_buff= dx;
+    _prev_keypose_buff = pose;
+    _prev_time_buff=nowTime;
+    _submap_flat_cloud_buff=flat_cloud;
+    _submap_cloud_buff=cloud;
+    return true;
   }
-
+void param_update()
+{
+  _accum_distance+=_accum_distance_buff;
+  _prev_keypose=_prev_keypose_buff;
+  _prev_time=_prev_time_buff;
+  _submap_flat_cloud=_submap_flat_cloud_buff;
+  _submap_cloud=_submap_cloud_buff;
+}
+double get_accum_distance()
+{
+  return _accum_distance;
+}
+Eigen::Isometry3d get_prev_pose()
+{
+  return _prev_keypose;
+}
+ros::Time get_prev_time()
+{
+  return _prev_time;
+}
+pcl::PointCloud<PointT>::Ptr get_submap_cloud()
+{
+  return _submap_cloud;
+}
+pcl::PointCloud<pcl::PointXYZI>::Ptr get_submap_flat_cloud()
+{
+  return _submap_flat_cloud;
+}
 public:
-  std::shared_ptr<KeyFrame> _keyFramePtr;
+  std::shared_ptr<KeyFrame> _kefFrame_ptr;
 private:
   // parameters
-  double _keyframeDeltaTrans;      //
-  double _keyframeDeltaAngle;      //
-  double _keyframeDeltaTime;
+  double _keyframe_delta_trans;      //
+  double _keyframe_delta_angle;      //
+  double _keyframe_delta_time;
   bool is_first;
+private:
+  double _accum_distance_buff;
+  Eigen::Isometry3d _prev_keypose_buff;
+  ros::Time _prev_time_buff;
+  pcl::PointCloud<PointT>::Ptr _submap_cloud_buff;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud_buff;
+private:
+  pcl::PointCloud<PointT>::Ptr _submap_cloud;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud;
   Eigen::Isometry3d _prev_keypose;
   ros::Time _prev_time;
+  double _accum_distance;
 };
 }
 #endif // KEYFRAMEUPDATE_H

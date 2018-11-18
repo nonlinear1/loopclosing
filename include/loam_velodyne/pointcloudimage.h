@@ -24,34 +24,41 @@ public:
 };
 struct PCloudPose
 {
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr _cloud;
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr _cloud;
   Eigen::Quaterniond _r;
   Eigen::Vector3d _t;
   ros::Time _stamp;
+  bool _is_rgb=false;
 };
 class PointCloudImage
 {
 public:
   PointCloudImage();
   void readConfig(const std::string& path);
-  void interpolate();
-  void projected();
+  cv::Vec3b interpolate(double x,double y,const cv::Mat img);
+  void projected(int index);
   bool setup(ros::NodeHandle& nh,ros::NodeHandle& private_nh);
   void imageCallback(const sensor_msgs::ImageConstPtr& img);
   void pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& pointscloud,const nav_msgs::OdometryConstPtr& odom);
   void publishResult();
-  void calImagePose();
+  void calImagePose(int index);
 public:
   Eigen::Matrix<double,3,4> _projected;
-  std::unique_ptr<CircularBuffer<Image>> _images_bufffer;
+  Eigen::Isometry3d _relative_pose;
+  int _height,_width;
+  std::vector<CircularBuffer<Image>> _images_bufffer;
   std::vector<PCloudPose> _vec_pointcloud;
-  std::vector<Image> _vec_pose_image;
+  std::vector<std::vector<Image>> _vec_pose_image;
+  int _camera_number;
   ros::Publisher _pub_pointscloud;
   ros::Publisher _pub_odom;
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_pointscloud;
   std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> _sub_odom;
   std::unique_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry>> _syn;
   ros::Subscriber _sub_image;
+
+  //debug param
+  int view=0;
 };
 }
 #endif // POINTCLOUDIMAGE_H

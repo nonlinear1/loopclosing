@@ -11,17 +11,23 @@ namespace loam {
 class KeyFrame {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  typedef pcl::PointXYZRGB PointT;
 using Ptr=std::shared_ptr<KeyFrame>;
   KeyFrame(const nav_msgs::Odometry& odom):
-      _cloud(new pcl::PointCloud<pcl::PointXYZI>()),
-      _node(new g2o::VertexSE3)
+      _cloud(new pcl::PointCloud<PointT>()),
+      _node(new g2o::VertexSE3),
+      _floor_coeffes(boost::none)
   {
-      _odom.push_back(odom);
+    _befOptimPose=Eigen::Isometry3d::Identity();
+    id=0;
   }
   KeyFrame():
-    _cloud(new pcl::PointCloud<pcl::PointXYZI>()),
-    _node(new g2o::VertexSE3)
+    _cloud(new pcl::PointCloud<PointT>()),
+    _node(new g2o::VertexSE3),
+    _floor_coeffes(boost::none)
   {
+    _befOptimPose=Eigen::Isometry3d::Identity();
+    id=0;
   }
   ~KeyFrame()
   {
@@ -30,32 +36,32 @@ using Ptr=std::shared_ptr<KeyFrame>;
 
 public:
   ros::Time _stamp;                                // timestamp
-  std::vector<nav_msgs::Odometry> _odom;                         // odometry (estimated by scan_matching_odometry)
-  pcl::PointCloud<pcl::PointXYZI>::ConstPtr _cloud;        // point cloud
-  pcl::PointCloud<pcl::PointXYZI>::ConstPtr _flat_cloud;
-  nav_msgs::Odometry pose;
+  pcl::PointCloud<PointT>::ConstPtr _cloud;        // point cloud
 
-  Eigen::Isometry3d iso_pose;
-  std::vector<Eigen::Isometry3d> vec_pose;
+  Eigen::Isometry3d _pose;
+  Eigen::Isometry3d _befOptimPose;
+  boost::optional<Eigen::Vector4f> _floor_coeffes;
   float _accumulate_distance;
   g2o::VertexSE3* _node;
+  uint64_t id;
 };
 class KeyFrameSnapshot
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  typedef pcl::PointXYZRGB PointT;
   using Ptr=std::shared_ptr<KeyFrameSnapshot>;
   KeyFrameSnapshot(const KeyFrame::Ptr& key_frame):
     _cloud(key_frame->_cloud),
   _pose(key_frame->_node->estimate()){}
     //_cloud(key_frame->_cloud){}
  // _pose(key_frame->_node->estimate()){}
-  KeyFrameSnapshot(pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud,const Eigen::Isometry3d& pose):
+  KeyFrameSnapshot(pcl::PointCloud<PointT>::ConstPtr pointcloud,const Eigen::Isometry3d& pose):
     _cloud(pointcloud),
     _pose(pose)
   {}
  public:
-  pcl::PointCloud<pcl::PointXYZI>::ConstPtr _cloud;
+  pcl::PointCloud<PointT>::ConstPtr _cloud;
   Eigen::Isometry3d _pose;
 };
 }

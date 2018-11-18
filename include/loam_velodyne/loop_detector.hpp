@@ -3,7 +3,7 @@
 
 #include <loam_velodyne/keyframe.hpp>
 #include <loam_velodyne/registrations.hpp>
-
+#include <pcl/filters/voxel_grid.h>
 
 namespace loam {
 
@@ -35,15 +35,18 @@ public:
    * @brief constructor
    * @param pnh
    */
-  LoopDetector(ros::NodeHandle& pnh) {
+  LoopDetector(ros::NodeHandle& pnh,bool child_to_master) {
     distance_thresh = pnh.param<double>("distance_thresh", 5.0);
     accum_distance_thresh = pnh.param<double>("accum_distance_thresh", 8.0);
     distance_from_last_edge_thresh = pnh.param<double>("min_edge_interval", 5.0);
-
     fitness_score_thresh = pnh.param<double>("fitness_score_thresh", 0.5);
-
+    child_master_distance_thresh=pnh.param<double>("child_master_distance_thresh", 1);
+    
+    std::cout<<distance_thresh<<" "<<accum_distance_thresh<<" "<<distance_from_last_edge_thresh<<" "<<fitness_score_thresh<<" "<<child_master_distance_thresh<<std::endl;
     registration = select_registration_method(pnh);
     last_edge_accum_distance = 0.0;
+    child_master_flag=child_to_master;
+    _downSizeFilterCloud.setLeafSize(0.4, 0.4, 0.4);
   }
 
   /**
@@ -56,6 +59,8 @@ public:
     std::vector<Loop::Ptr> detected_loops;
     for(const auto& new_keyframe : new_keyframes) {
       auto candidates = find_candidates(keyframes, new_keyframe);
+      if(registration)
+         std::cout<<"candidates size:"<<candidates.size()<<std::endl;
       auto loop = matching(candidates, new_keyframe);
       if(loop) {
         detected_loops.push_back(loop);
@@ -78,6 +83,11 @@ private:
    */
   std::vector<KeyFrame::Ptr> find_candidates(const std::vector<KeyFrame::Ptr>& keyframes, const KeyFrame::Ptr& new_keyframe) const {
     // too close to the last registered loop edge
+   if(registration)
+   {
+       std::cout<<"new_keyframe->_accumulate_distance"<<new_keyframe->_accumulate_distance<<std::endl;
+       std::cout<<"last_edge_accum_distance"<<last_edge_accum_distance<<" "<<"distance_from_last_edge_thresh"<<distance_from_last_edge_thresh<<std::endl;
+   }
    if(new_keyframe->_accumulate_distance - last_edge_accum_distance < distance_from_last_edge_thresh) {
       return std::vector<KeyFrame::Ptr>();
     }
@@ -87,19 +97,42 @@ private:
 
     for(const auto& k : keyframes) {
       // traveled distance between keyframes is too small
-      if(new_keyframe->_accumulate_distance - k->_accumulate_distance < accum_distance_thresh) {
-        continue;
+      if(!registration)
+      {
+        if(new_keyframe->_accumulate_distance - k->_accumulate_distance < accum_distance_thresh) {
+          continue;
+        }
       }
 
       const auto& pos1 = k->_node->estimate().translation();
       const auto& pos2 = new_keyframe->_node->estimate().translation();
 
       // estimated distance between keyframes is too small
-      double dist = (pos1.head<2>() - pos2.head<2>()).norm();
-      if(dist > distance_thresh) {
-        continue;
+      double dist=std::sqrt(std::pow(pos1(0)-pos2(0),2)+std::pow(pos1(2)-pos2(2),2));
+      if(registration)
+      {
+          std::cout<<"distance diff:"<<dist<<std::endl;
       }
-
+      if(registration)
+      {
+         if(dist > child_master_distance_thresh) {
+            continue;
+         }
+      }
+      else
+      {
+         if(dist > distance_thresh) {
+            continue;
+         }
+      }
+      //double dist = (pos1.head<2>() - pos2.head<2>()).norm();
+     // if(dist > distance_thresh) {
+      //  continue;
+     // }
+      //std::cout<<"accum distance diff:"<<new_keyframe->_accumulate_distance - k->_accumulate_distance<<std::endl;
+      //std::cout<<"distance diff:"<<dist<<std::endl;
+      //std::cout<<"accum dis1:"<<new_keyframe->_accumulate_distance<<std::endl;
+      //std::cout<<"accum dis2:"<<k->_accumulate_distance<<std::endl;
       candidates.push_back(k);
     }
 
@@ -116,7 +149,9 @@ private:
     if(candidate_keyframes.empty()) {
       return nullptr;
     }
-    registration->setInputTarget(new_keyframe->_cloud);
+    pcl::PointCloud<PointT>::Ptr trans_cloud(new pcl::PointCloud<PointT>);
+    pcl::copyPointCloud(*(new_keyframe->_cloud),*trans_cloud);
+    registration->setInputTarget(trans_cloud);
     double best_score = std::numeric_limits<double>::max();
     KeyFrame::Ptr best_matched;
     Eigen::Matrix4d relative_pose;
@@ -130,7 +165,12 @@ private:
     pcl::PointCloud<PointT>::Ptr aligned(new pcl::PointCloud<PointT>());
     for(const auto& candidate : candidate_keyframes) {
       ros::Time clo_start=ros::Time::now();
-      registration->setInputSource(candidate->_cloud);
+      pcl::PointCloud<PointT>::Ptr trans_src_cloud(new pcl::PointCloud<PointT>);
+      pcl::PointCloud<PointT>::Ptr filter_src_cloud(new pcl::PointCloud<PointT>);
+      pcl::copyPointCloud(*(candidate->_cloud),*trans_src_cloud);
+      _downSizeFilterCloud.setInputCloud(trans_src_cloud);
+      _downSizeFilterCloud.filter(*filter_src_cloud);
+      registration->setInputSource(filter_src_cloud);
       Eigen::Matrix4f guess= (new_keyframe->_node->estimate().inverse() * candidate->_node->estimate()).matrix().cast<float>();
       guess(2, 3) = 0.0;
       registration->align(*aligned, guess);
@@ -171,8 +211,11 @@ private:
   double fitness_score_thresh;            // threshold for scan matching
 
   double last_edge_accum_distance;
-
+ 
+  double child_master_distance_thresh;
+  bool child_master_flag;
   pcl::Registration<PointT, PointT>::Ptr registration;
+  pcl::VoxelGrid<PointT> _downSizeFilterCloud;
 };
 
 }

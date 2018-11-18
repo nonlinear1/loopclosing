@@ -10,6 +10,7 @@ int main(int argc, char **argv)
 
   if (optimization.setup(node, privateNode)) {
     // initialization successful
+    std::cout<<"ffffffff"<<std::endl;
     optimization.spin();
   }
 

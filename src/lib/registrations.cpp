@@ -9,8 +9,7 @@
 
 namespace loam {
 
-boost::shared_ptr<pcl::Registration<pcl::PointXYZI, pcl::PointXYZI>> select_registration_method(ros::NodeHandle& pnh) {
-  using PointT = pcl::PointXYZI;
+boost::shared_ptr<pcl::Registration<PointT, PointT>> select_registration_method(ros::NodeHandle& pnh) {
 
   // select a registration method (ICP, GICP, NDT)
   std::string registration_method = pnh.param<std::string>("registration_method", "NDT_OMP");
