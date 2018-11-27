@@ -43,6 +43,8 @@ private:
     ros::Publisher pubOdomAftMapped;
     ros::Publisher pubKeyPoses;
     ros::Publisher pubLaserFlatCloud;
+    ros::Publisher publaserFlatAndCornerCloud;
+    ros::Publisher pubOutlierCloud;
 
     ros::Publisher pubHistoryKeyFrames;
     ros::Publisher pubIcpKeyFrames;
@@ -142,11 +144,12 @@ private:
     double _prev_time;
     std::vector<pcl::PointCloud<PointType>::Ptr> submap_corner;
     std::vector<pcl::PointCloud<PointType>::Ptr> submap_surf;
+    std::vector<pcl::PointCloud<PointType>::Ptr> submap_outlier;
     int _submap_size=50;
     bool is_first;
     float _keyframe_delta_trans=0.3;
     float _keyframe_delta_angle=1;
-    float _keyframe_delta_time=0.5;
+    float _keyframe_delta_time=0.01;
 
     double timeLaserCloudCornerLast;
     double timeLaserCloudSurfLast;
@@ -216,6 +219,8 @@ public:
     {
         pubKeyPoses = nh.advertise<sensor_msgs::PointCloud2>("/key_pose_origin", 2);
         pubLaserFlatCloud = nh.advertise<sensor_msgs::PointCloud2>("/laser_flat_cloud", 2);
+        publaserFlatAndCornerCloud=nh.advertise<sensor_msgs::PointCloud2>("/laser_flatcorner_cloud",2);
+        pubOutlierCloud=nh.advertise<sensor_msgs::PointCloud2>("/laser_outlier_cloud",2);
         pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surround", 2);
         pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 5);
         pubOdomAftMapped_inter = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init_inter", 5);
@@ -594,6 +599,7 @@ public:
         timeLaserCloudOutlierLast = msg->header.stamp.toSec();
         laserCloudOutlierLast->clear();
         pcl::fromROSMsg(*msg, *laserCloudOutlierLast);
+       // std::cout<<"laserCloudOutlierLast size:"<<laserCloudOutlierLast->size()<<std::endl;
         newLaserCloudOutlierLast = true;
     }
 
@@ -601,6 +607,7 @@ public:
         timeLaserCloudCornerLast = msg->header.stamp.toSec();
         laserCloudCornerLast->clear();
         pcl::fromROSMsg(*msg, *laserCloudCornerLast);
+       // std::cout<<"laserCloudCornerLast size:"<<laserCloudCornerLast->size()<<std::endl;
         newLaserCloudCornerLast = true;
     }
 
@@ -608,6 +615,7 @@ public:
         timeLaserCloudSurfLast = msg->header.stamp.toSec();
         laserCloudSurfLast->clear();
         pcl::fromROSMsg(*msg, *laserCloudSurfLast);
+        //std::cout<<"laserCloudSurfLast size:"<<laserCloudSurfLast->size()<<std::endl;
         newLaserCloudSurfLast = true;
     }
 
@@ -690,9 +698,9 @@ public:
         surroudCloudDS->clear();
         surroudCloud->reserve(laserCloudSurfLast->size()+laserCloudCornerLast->size()+laserCloudOutlierLast->size());
 
-        *surroudCloud+=*laserCloudSurfLast;
-        *surroudCloud+=*laserCloudCornerLast;
-        *surroudCloud+=*laserCloudOutlierLast;
+        *surroudCloud+=*laserCloudSurfLastDS;
+        *surroudCloud+=*laserCloudCornerLastDS;
+        *surroudCloud+=*laserCloudOutlierLastDS;
         downSizeFilterGlobalMapKeyFrames.setInputCloud(surroudCloud);
         downSizeFilterGlobalMapKeyFrames.filter(*surroudCloudDS);
         sensor_msgs::PointCloud2 cloudMsgTemp;
@@ -704,10 +712,29 @@ public:
       if(pubLaserFlatCloud.getNumSubscribers() !=0)
       {
         sensor_msgs::PointCloud2 cloudMsgTemp;
-        pcl::toROSMsg(*laserCloudSurfLast, cloudMsgTemp);
+        pcl::toROSMsg(*laserCloudSurfLastDS, cloudMsgTemp);
         cloudMsgTemp.header.stamp = ros::Time().fromSec(timeLaserOdometry);
         cloudMsgTemp.header.frame_id = "/camera_init";
         pubLaserFlatCloud.publish(cloudMsgTemp);
+      }
+      if(publaserFlatAndCornerCloud.getNumSubscribers() !=0)
+      {
+        pcl::PointCloud<PointType>::Ptr flatCorner(new pcl::PointCloud<PointType>());
+        *flatCorner+=*laserCloudCornerLastDS;
+        *flatCorner+=*laserCloudSurfLastDS;
+        sensor_msgs::PointCloud2 cloudMsgTemp;
+        pcl::toROSMsg(*flatCorner, cloudMsgTemp);
+        cloudMsgTemp.header.stamp = ros::Time().fromSec(timeLaserOdometry);
+        cloudMsgTemp.header.frame_id = "/camera_init";
+        publaserFlatAndCornerCloud.publish(cloudMsgTemp);
+      }
+      if(pubOutlierCloud.getNumSubscribers() !=0)
+      {
+        sensor_msgs::PointCloud2 cloudMsgTemp;
+        pcl::toROSMsg(*laserCloudOutlierLastDS, cloudMsgTemp);
+        cloudMsgTemp.header.stamp = ros::Time().fromSec(timeLaserOdometry);
+        cloudMsgTemp.header.frame_id = "/camera_init";
+        pubOutlierCloud.publish(cloudMsgTemp);
       }
     }
 
@@ -733,17 +760,22 @@ public:
 
         //transform to map
         pcl::PointCloud<PointType>::Ptr last_corner_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-        last_corner_cloud->reserve(laserCloudCornerLast->size());
-        pcl::transformPointCloud(*laserCloudCornerLast,*last_corner_cloud,last_pose.cast<float>());
+        last_corner_cloud->reserve(laserCloudCornerLastDS->size());
+        pcl::transformPointCloud(*laserCloudCornerLastDS,*last_corner_cloud,last_pose.cast<float>());
 
         pcl::PointCloud<pcl::PointXYZI>::Ptr last_surf_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-        last_surf_cloud->reserve(laserCloudSurfLast->size());
-        pcl::transformPointCloud(*laserCloudSurfLast,*last_surf_cloud,last_pose.cast<float>());
+        last_surf_cloud->reserve(laserCloudSurfLastDS->size());
+        pcl::transformPointCloud(*laserCloudSurfLastDS,*last_surf_cloud,last_pose.cast<float>());
+
+        pcl::PointCloud<pcl::PointXYZI>::Ptr last_outlier_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+        last_outlier_cloud->reserve(laserCloudOutlierLastDS->size());
+        pcl::transformPointCloud(*laserCloudOutlierLastDS,*last_outlier_cloud,last_pose.cast<float>());
 
         //downsize pointcloud
 
         submap_corner.push_back(last_corner_cloud);
         submap_surf.push_back(last_surf_cloud);
+        submap_outlier.push_back(last_outlier_cloud);
         return false;
       }
 
@@ -767,15 +799,20 @@ public:
         last_surf_cloud->reserve(laserCloudSurfLast->size());
         pcl::transformPointCloud(*laserCloudSurfLast,*last_surf_cloud,last_pose.cast<float>());
 
+        pcl::PointCloud<pcl::PointXYZI>::Ptr last_outlier_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+        last_outlier_cloud->reserve(laserCloudOutlierLastDS->size());
+        pcl::transformPointCloud(*laserCloudOutlierLastDS,*last_outlier_cloud,last_pose.cast<float>());
         //downsize pointcloud
 
         submap_corner.push_back(last_corner_cloud);
         submap_surf.push_back(last_surf_cloud);
+        submap_outlier.push_back(last_outlier_cloud);
 
         if(submap_corner.size()>_submap_size)
         {
           submap_corner.erase(submap_corner.begin());
           submap_surf.erase(submap_surf.begin());
+          submap_outlier.erase(submap_outlier.begin());
         }
         _prev_keypose = last_pose;
         _prev_time=timeLaserOdometry;
@@ -790,6 +827,7 @@ public:
       {
         *laserCloudCornerFromMap += *submap_corner[i];
         *laserCloudSurfFromMap += *submap_surf[i];
+        *laserCloudSurfFromMap+=*submap_outlier[i];
       }
         downSizeFilterCorner.setInputCloud(laserCloudCornerFromMap);
         downSizeFilterCorner.filter(*laserCloudCornerFromMapDS);

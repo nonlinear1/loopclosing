@@ -60,7 +60,7 @@ extern const int groundScanInd = 7;
 extern const bool loopClosureEnableFlag = true;
 extern const double mappingProcessInterval = 0.3;
 
-extern const float scanPeriod = 0.1;
+extern const float scanPeriod = 0.2;
 extern const int systemDelay = 0;
 extern const int imuQueLength = 200;
 extern const string imuTopic = "/imu/data";

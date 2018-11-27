@@ -39,10 +39,18 @@ public:
         if(dx>distance)
           continue;
       }
+      pcl::PointCloud<PointT>::Ptr validCloud(new pcl::PointCloud<PointT>());
+      validCloud->reserve(keyframe->_cloud->size());
+      for(int i=0;i<keyframe->_cloud->size();i++)
+      {
+        PointT validPoint=keyframe->_cloud->points[i];
+        if(validPoint.r !=255 || validPoint.g!=255 || validPoint.b !=255)
+           validCloud->push_back(validPoint);
+      }
      // std::cout<<"pose"<<keyframe->_pose.matrix()<<std::endl;
       pcl::PointCloud<PointT>::Ptr keyframe_cloud(new pcl::PointCloud<PointT>());
       keyframe_cloud->reserve(keyframe->_cloud->size());
-      pcl::transformPointCloud(*(keyframe->_cloud),*(keyframe_cloud),keyframe->_pose.cast<float>());
+      pcl::transformPointCloud(*validCloud,*(keyframe_cloud),keyframe->_pose.cast<float>());
       //pcl::transformPointCloud(*(keyframe->_cloud),*(keyframe_cloud),relative_pose);
       *cloud+=*keyframe_cloud;
     }

@@ -10,10 +10,11 @@ int main(int argc, char **argv)
   ros::NodeHandle privateNode("~");
 
   loam::PointCloudImage laserImage;
-
+  ros::AsyncSpinner spinner(2);
   if (laserImage.setup(node, privateNode)) {
     // initialization successful
-    ros::spin();
+    spinner.start();
+    ros::waitForShutdown();
   }
 
   return 0;

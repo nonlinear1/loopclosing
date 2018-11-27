@@ -29,9 +29,10 @@
 #include "draco/io/point_cloud_io.h"
 #include "draco/core/macros.h"
 #include<draco/attributes/geometry_attribute.h>
+#include<loam_velodyne/loop_detector_pcl.hpp>
 namespace loam {
 struct Options {
-  Options();
+  Options(int posQBits);
 
   bool is_point_cloud;
   int pos_quantization_bits;
@@ -62,7 +63,9 @@ public:
 
   void laser_cloud_odom_vecodom_callback(const sensor_msgs::PointCloud2ConstPtr& cloud,
                                          const nav_msgs::OdometryConstPtr& odom,
-                                         const sensor_msgs::PointCloud2ConstPtr& flat);
+                                         const sensor_msgs::PointCloud2ConstPtr& flat,
+                                         const sensor_msgs::PointCloud2ConstPtr& flatcorner,
+                                         const sensor_msgs::PointCloud2ConstPtr& outlier);
   void received_cloud_callback(const std_msgs::ByteMultiArrayConstPtr& cloudAndPosePtr);
   std::vector<std::string> split(const std::string& str, const std::string& delim);
   bool flush_floor_queue();
@@ -74,7 +77,7 @@ public:
   bool mapvis_info_cllback(loam_velodyne::GlobalMapRequest& req,loam_velodyne::GlobalMapResponse& res);
   visualization_msgs::MarkerArray creat_trajectory(const ros::Time& stamp);
   g2o::VertexPlane* select_global_plane_node(const Eigen::Isometry3d& pose_now,const Eigen::Vector4d& plane_now);
-  void transportCloudToAnathorMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr test_cloud);
+  void transportCloudToAnathorMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr& test_cloud);
   void decoder_image(std_msgs::ByteMultiArray received_image,pcl::PointCloud<PointT>::Ptr& testCloud);
   bool calChildToMasterPose(pcl::PointCloud<PointT>::Ptr masterCloud,Eigen::Isometry3d& childToMaster);
   bool childNodeInit(pcl::PointCloud<PointT>::Ptr nowCloud);
@@ -102,17 +105,19 @@ public:
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_laser_submap_pointcloud;
   std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> _sub_submap_odom;
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_flat_cloud;
+  std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_flatcorner_cloud;
+  std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_outlier_cloud;
   std::unique_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry,
-  sensor_msgs::PointCloud2>> _time_syn;
+  sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,sensor_msgs::PointCloud2>> _time_syn;
 
   ros::Subscriber _sub_floor_coeffs;
 
   int _max_keyframes_per_update;
   float _floor_edge_stddev;
   //loop closure
-  std::unique_ptr<LoopDetector> _loop_detector;
-  std::unique_ptr<LoopDetector> _child_loop_detector;
-  std::unique_ptr<LoopDetector> _childmaster_loop_detector;
+  std::unique_ptr<LoopDetectorICP> _loop_detector;
+  std::unique_ptr<LoopDetectorICP> _child_loop_detector;
+  std::unique_ptr<LoopDetectorICP> _childmaster_loop_detector;
 
   //define timer to execute graph optimization and publish map pointcloud
   ros::Timer _optimization_timer;
@@ -183,7 +188,8 @@ public:
   pcl::VoxelGrid<PointT> _downSizeFilterSendCloud; 
   int send_cloud_num=0;
   int receied_cloud_num=0;
-  Options _options;
+  int _pos_quantization_bits;
+  std::unique_ptr<Options> _options;
   draco::Encoder _encoder;
 };
 typedef union

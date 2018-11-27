@@ -24,7 +24,9 @@ typedef pcl::PointXYZRGB PointT;
       _keyframe_delta_time(2.0),
       _accum_distance(0),
       _submap_cloud( new pcl::PointCloud<PointT>()),
-      _submap_flat_cloud( new pcl::PointCloud<pcl::PointXYZI>())
+      _submap_flat_cloud( new pcl::PointCloud<pcl::PointXYZI>()),
+      _submap_flatcorner_cloud(new pcl::PointCloud<PointT>()),
+      _submap_outlier_cloud(new pcl::PointCloud<PointT>())
   {
      float fParam;
      if(pnh.getParam("keyframe_delta_trans",fParam))
@@ -50,7 +52,9 @@ typedef pcl::PointXYZRGB PointT;
    */
   bool update(const Eigen::Isometry3d& pose,ros::Time nowTime,
               const pcl::PointCloud<PointT>::Ptr& cloud,
-              const pcl::PointCloud<pcl::PointXYZI>::Ptr& flat_cloud) {
+              const pcl::PointCloud<pcl::PointXYZI>::Ptr& flat_cloud,
+              const pcl::PointCloud<PointT>::Ptr& flatcorner,
+              const pcl::PointCloud<PointT>::Ptr& outlier) {
     // first frame is always registered to the graph
     if(is_first) {
       is_first = false;
@@ -58,6 +62,8 @@ typedef pcl::PointXYZRGB PointT;
       _prev_time=nowTime;
       _accum_distance=0;
       *_submap_cloud+=*cloud;
+      *_submap_flatcorner_cloud+=*flatcorner;
+      *_submap_outlier_cloud+=*outlier;
       *_submap_flat_cloud+=*flat_cloud;
       return false;
     }
@@ -75,6 +81,16 @@ typedef pcl::PointXYZRGB PointT;
       pcl::transformPointCloud(*(cloud),*(transform_cloud),delta.cast<float>());
       *_submap_cloud+=*transform_cloud;
 
+      pcl::PointCloud<PointT>::Ptr flatcorner_cloud(new pcl::PointCloud<PointT>());
+      flatcorner_cloud->reserve(flatcorner->size());
+      pcl::transformPointCloud(*(flatcorner),*(flatcorner_cloud),delta.cast<float>());
+      *_submap_flatcorner_cloud+=*flatcorner_cloud;
+
+      pcl::PointCloud<PointT>::Ptr outlier_cloud(new pcl::PointCloud<PointT>());
+      outlier_cloud->reserve(outlier->size());
+      pcl::transformPointCloud(*(outlier),*(outlier_cloud),delta.cast<float>());
+      *_submap_outlier_cloud+=*outlier_cloud;
+
       pcl::PointCloud<pcl::PointXYZI>::Ptr transform_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>);
       transform_flat_cloud->reserve(flat_cloud->size());
       pcl::transformPointCloud(*flat_cloud,*transform_flat_cloud,delta.cast<float>());
@@ -86,6 +102,8 @@ typedef pcl::PointXYZRGB PointT;
     _prev_time_buff=nowTime;
     _submap_flat_cloud_buff=flat_cloud;
     _submap_cloud_buff=cloud;
+    _submap_outlier_cloud_buff=outlier;
+    _submap_flatcorner_cloud_buff=flatcorner;
     return true;
   }
 void param_update()
@@ -95,6 +113,8 @@ void param_update()
   _prev_time=_prev_time_buff;
   _submap_flat_cloud=_submap_flat_cloud_buff;
   _submap_cloud=_submap_cloud_buff;
+  _submap_flatcorner_cloud=_submap_flatcorner_cloud_buff;
+  _submap_outlier_cloud=_submap_outlier_cloud_buff;
 }
 double get_accum_distance()
 {
@@ -111,6 +131,14 @@ ros::Time get_prev_time()
 pcl::PointCloud<PointT>::Ptr get_submap_cloud()
 {
   return _submap_cloud;
+}
+pcl::PointCloud<PointT>::Ptr get_submap_flatcorner_cloud()
+{
+  return _submap_flatcorner_cloud;
+}
+pcl::PointCloud<PointT>::Ptr get_submap_outlier_cloud()
+{
+  return _submap_outlier_cloud;
 }
 pcl::PointCloud<pcl::PointXYZI>::Ptr get_submap_flat_cloud()
 {
@@ -129,9 +157,13 @@ private:
   Eigen::Isometry3d _prev_keypose_buff;
   ros::Time _prev_time_buff;
   pcl::PointCloud<PointT>::Ptr _submap_cloud_buff;
+  pcl::PointCloud<PointT>::Ptr _submap_flatcorner_cloud_buff;
+  pcl::PointCloud<PointT>::Ptr _submap_outlier_cloud_buff;
   pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud_buff;
 private:
   pcl::PointCloud<PointT>::Ptr _submap_cloud;
+  pcl::PointCloud<PointT>::Ptr _submap_flatcorner_cloud;
+  pcl::PointCloud<PointT>::Ptr _submap_outlier_cloud;
   pcl::PointCloud<pcl::PointXYZI>::Ptr _submap_flat_cloud;
   Eigen::Isometry3d _prev_keypose;
   ros::Time _prev_time;

@@ -37,6 +37,8 @@ using Ptr=std::shared_ptr<KeyFrame>;
 public:
   ros::Time _stamp;                                // timestamp
   pcl::PointCloud<PointT>::ConstPtr _cloud;        // point cloud
+  pcl::PointCloud<PointT>::ConstPtr _flatcorner_cloud;        // point cloud
+  pcl::PointCloud<PointT>::ConstPtr _outlier_cloud;        // point cloud
 
   Eigen::Isometry3d _pose;
   Eigen::Isometry3d _befOptimPose;

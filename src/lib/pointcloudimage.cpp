@@ -12,31 +12,70 @@
 namespace loam {
 bool PointCloudImage::setup(ros::NodeHandle& nh,ros::NodeHandle& private_nh)
 {
-  std::string defual_path=ros::package::getPath("loam_velodyne")+"/config/fisheye.ini";
-  std::string path=private_nh.param<std::string>("config_file",defual_path);
-  if(!boost::filesystem::exists(path))
-    std::cout<<"path is not exists"<<std::endl;
-  if(path.size()==0)
+  _camera_number=private_nh.param<int>("camera_number",4);
+  _intrinsicPath=private_nh.param<std::string>("intrinsic","");
+  _extrinsic1Path=private_nh.param<std::string>("extrinsic1","");
+  _extrinsic2Path=private_nh.param<std::string>("extrinsic2","");
+  _extrinsic3Path=private_nh.param<std::string>("extrinsic3","");
+  _extrinsic4Path=private_nh.param<std::string>("extrinsic4","");
+  camera1_pre_theta=private_nh.param<float>("camera1_pre_theta",0);
+  camera2_pre_theta=private_nh.param<float>("camera2_pre_theta",0);
+  camera3_pre_theta=private_nh.param<float>("camera3_pre_theta",0);
+  camera4_pre_theta=private_nh.param<float>("camera4_pre_theta",0);
+  _resizeImageTimes=private_nh.param<int>("resizeImageTimes",4);
+  if(_intrinsicPath.length() == 0)
   {
-    std::cout<<"camera intinsic is none"<<std::endl;
-    return false;
+    std::cout<<"intrinsic path is empty"<<std::endl;
+    exit(0);
   }
-  _camera_number=private_nh.param<int>("camera_number",1);
-  readConfig(path);
+  if(_extrinsic1Path.length() != 0 )
+  {
+    Eigen::Isometry3d temrelaPose;
+    Eigen::AngleAxisd rotateY(camera1_pre_theta*M_PI/180,Eigen::Vector3d(0,1,0));
+    readExtrinsic(_extrinsic1Path,temrelaPose);
+    _relative_poses.push_back(temrelaPose*rotateY);
+  }
+  if(_extrinsic2Path.length() != 0 )
+  {
+    Eigen::Isometry3d temrelaPose;
+    Eigen::AngleAxisd rotateY(camera2_pre_theta*M_PI/180,Eigen::Vector3d(0,1,0));
+    readExtrinsic(_extrinsic2Path,temrelaPose);
+    _relative_poses.push_back(temrelaPose*rotateY);
+  }
+  if(_extrinsic3Path.length() != 0 )
+  {
+    Eigen::Isometry3d temrelaPose;
+    Eigen::AngleAxisd rotateY(camera3_pre_theta*M_PI/180,Eigen::Vector3d(0,1,0));
+    readExtrinsic(_extrinsic3Path,temrelaPose);
+    _relative_poses.push_back(temrelaPose*rotateY);
+  }
+  if(_extrinsic4Path.length() != 0 )
+  {
+    Eigen::Isometry3d temrelaPose;
+    Eigen::AngleAxisd rotateY(camera4_pre_theta*M_PI/180,Eigen::Vector3d(0,1,0));
+    readExtrinsic(_extrinsic4Path,temrelaPose);
+    _relative_poses.push_back(temrelaPose*rotateY);
+  }
+  if(!boost::filesystem::exists(_intrinsicPath))
+    std::cout<<"path is not exists"<<std::endl;
+  readIntrinsic(_intrinsicPath);
 
   _images_bufffer.resize(_camera_number);
   _vec_pose_image.resize(_camera_number);
   for(int i=0;i<_camera_number;i++)
   {
     _vec_pose_image[i].reserve(10);
-    _images_bufffer[i].ensureCapacity(50);
+    _images_bufffer[i].ensureCapacity(25);
   }
   //_sub_pointscloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_cloud_surround",2));
   _sub_pointscloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_cloud_surround",2));
   _sub_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
   _syn.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry>(*_sub_pointscloud,*_sub_odom,2));
   _syn->registerCallback(boost::bind(&PointCloudImage::pointcloudCallback,this,_1,_2));
-  _sub_image=nh.subscribe<sensor_msgs::Image>("/pylon_cam_raw",2,&PointCloudImage::imageCallback,this);
+  _sub_image1=nh.subscribe<sensor_msgs::Image>("/pylon_cam_raw1",2,boost::bind(&PointCloudImage::imageCallback,this,_1,0));
+  _sub_image2=nh.subscribe<sensor_msgs::Image>("/pylon_cam_raw2",2,boost::bind(&PointCloudImage::imageCallback,this,_1,1));
+  _sub_image3=nh.subscribe<sensor_msgs::Image>("/pylon_cam_raw3",2,boost::bind(&PointCloudImage::imageCallback,this,_1,2));
+  _sub_image4=nh.subscribe<sensor_msgs::Image>("/pylon_cam_raw4",2,boost::bind(&PointCloudImage::imageCallback,this,_1,3));
 
   _pub_pointscloud=nh.advertise<sensor_msgs::PointCloud2>("/rgb_points_cloud",2);
   _pub_odom=nh.advertise<nav_msgs::Odometry>("/rgb_points_cloud_odom",2);
@@ -47,7 +86,7 @@ PointCloudImage::PointCloudImage()
 {
    _vec_pointcloud.reserve(10);
 }
-void PointCloudImage::readConfig(const std::string& path)
+void PointCloudImage::readIntrinsic(const std::string& path)
 {
    std::ifstream in(path);
    in>>_width>>_height;
@@ -60,20 +99,25 @@ void PointCloudImage::readConfig(const std::string& path)
    _projected<<projected[0],projected[1],projected[2],projected[3],
              projected[4],projected[5],projected[6],projected[7],
              projected[8],projected[9],projected[10],projected[11];
-   float rela_pose[16];
-   for(int i=0;i<16;i++)
-   {
-     in>>rela_pose[i];
-   }
-   Eigen::Matrix4d relative_pose;
-   relative_pose<<rela_pose[0],rela_pose[1],rela_pose[2],rela_pose[3],
-                   rela_pose[4],rela_pose[5],rela_pose[6],rela_pose[7],
-                   rela_pose[8],rela_pose[9],rela_pose[10],rela_pose[11],
-                   rela_pose[12],rela_pose[13],rela_pose[14],rela_pose[15];
-   Eigen::Isometry3d tem_pose(relative_pose);
-   _relative_pose=tem_pose;
+
    std::cout<<"project"<<_projected<<std::endl;
-   std::cout<<"relative_pose"<<_relative_pose.matrix()<<std::endl;
+}
+void PointCloudImage::readExtrinsic(const std::string& path,Eigen::Isometry3d& relativePose)
+{
+  std::ifstream in(path);
+   float rela_pose[16];
+  for(int i=0;i<16;i++)
+  {
+    in>>rela_pose[i];
+  }
+  Eigen::Matrix4d relative_pose;
+  relative_pose<<rela_pose[0],rela_pose[1],rela_pose[2],rela_pose[3],
+                  rela_pose[4],rela_pose[5],rela_pose[6],rela_pose[7],
+                  rela_pose[8],rela_pose[9],rela_pose[10],rela_pose[11],
+                  rela_pose[12],rela_pose[13],rela_pose[14],rela_pose[15];
+  Eigen::Isometry3d tem_pose(relative_pose);
+  relativePose=tem_pose;
+  std::cout<<"relative_pose"<<tem_pose.matrix()<<std::endl;
 }
 void PointCloudImage::pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& pointscloud,const nav_msgs::OdometryConstPtr& odom)
 {
@@ -108,7 +152,7 @@ void PointCloudImage::pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr&
   publishResult();
   //std::cout<<"process time :"<<(ros::Time::now()-start).toSec()*1000<<std::endl;
 }
-void PointCloudImage::imageCallback(const sensor_msgs::ImageConstPtr& img)
+void PointCloudImage::imageCallback(const sensor_msgs::ImageConstPtr& img,int index)
 {
   cv_bridge::CvImagePtr cv_ptr;
   try
@@ -122,8 +166,8 @@ void PointCloudImage::imageCallback(const sensor_msgs::ImageConstPtr& img)
   }
   Image tem_image;
   tem_image._image=cv_ptr->image;
-  tem_image._stamp=img->header.stamp;
-  _images_bufffer[0].push(tem_image);
+  tem_image._stamp=img->header.stamp;//-ros::Duration(0.04);
+  _images_bufffer[index].push(tem_image);
 }
 void PointCloudImage::calImagePose(int index)
 {
@@ -195,7 +239,9 @@ void PointCloudImage::projected(int index)
          //set BGR
          //pcl::io::savePCDFileASCII("/home/mameng/PCDs/msg_point_cloud3.pcd",*(select_points._cloud));
          //cv::imwrite("/home/mameng/PCDs/image3.png",select_image._image);
-         cv::Mat image_debug=select_image._image;
+         cv::Mat resizeImage;
+         cv::resize(select_image._image,resizeImage,cv::Size(select_image._image.cols*_resizeImageTimes,select_image._image.rows*_resizeImageTimes));
+
          for(int p=0;p<orignal_cloud->size();p++)
          {
            pcl::PointXYZRGBA& point=orignal_cloud->points[p];
@@ -204,7 +250,7 @@ void PointCloudImage::projected(int index)
            //if the point is in the front of camera
            transform_point(0)=-transform_point(0);
            transform_point(1)=-transform_point(1);
-           Eigen::Vector4d camera_point=_relative_pose*transform_point;
+           Eigen::Vector4d camera_point=_relative_poses[index]*transform_point;
            if(camera_point(2)>0)
            {
              Eigen::Vector3d project_point=_projected*camera_point;
@@ -213,7 +259,7 @@ void PointCloudImage::projected(int index)
              if(project_point(0)>=0 && project_point(0)<=_width-1 &&
                 project_point(1)>=0 && project_point(1)<=_height-1)
              {
-                cv::Vec3b RGB=interpolate(project_point(0),project_point(1),select_image._image);
+                cv::Vec3b RGB=interpolate(project_point(0),project_point(1),resizeImage);
                // image_debug.at<cv::Vec3b>(int(project_point(1)),int(project_point(0)))[0]=255;
                // image_debug.at<cv::Vec3b>(int(project_point(1)),int(project_point(0)))[1]=255;
                // image_debug.at<cv::Vec3b>(int(project_point(1)),int(project_point(0)))[2]=255;
@@ -231,16 +277,16 @@ void PointCloudImage::projected(int index)
              }
            }
          }
-         std::stringstream ss;
+        /* std::stringstream ss;
          ss<<view;
          std::string name;
          ss>>name;
-         //std::ofstream in("/home/mameng/calibration/pose/"+name+"pose_view.txt");
-         //in<<relative_pose.matrix()<<std::endl;
-         //in.close();
-         //cv::imwrite("/home/mameng/calibration/image/"+name+"image_view.png",image_debug);
-         //pcl::io::savePCDFileASCII("/home/mameng/calibration/cloud/"+name+"cloud_view.pcd",*orignal_cloud);
-         view++;
+         std::ofstream in("/home/mameng/calibration/pose/"+name+"pose_view.txt");
+         in<<relative_pose.matrix()<<std::endl;
+         in.close();
+         cv::imwrite("/home/mameng/calibration/image/"+name+"image_view.png",image_debug);
+         pcl::io::savePCDFileASCII("/home/mameng/calibration/cloud/"+name+"cloud_view.pcd",*orignal_cloud);
+         view++;*/
          select_points._is_rgb=true;
          erase_image_index=std::max(erase_image_index,j);
          break;
@@ -290,6 +336,16 @@ void PointCloudImage::publishResult()
           point.r=deal_points->points[p].r;
           point.g=deal_points->points[p].g;
           point.b=deal_points->points[p].b;
+          rbg_points->push_back(point);
+        }
+        else
+        {
+          point.x=deal_points->points[p].x;
+          point.y=deal_points->points[p].y;
+          point.z=deal_points->points[p].z;
+          point.r=255;
+          point.g=255;
+          point.b=255;
           rbg_points->push_back(point);
         }
       }

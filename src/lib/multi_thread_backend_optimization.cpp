@@ -15,8 +15,9 @@
 #include<sensor_msgs/CompressedImage.h>
 #include<std_msgs/ByteMultiArray.h>
 #include<std_msgs/Byte.h>
+#include<loam_velodyne/loop_detector_pcl.hpp>
 namespace loam {
-Options::Options()
+Options::Options(int posQbits)
     : is_point_cloud(true),
       pos_quantization_bits(14),
       tex_coords_quantization_bits(12),
@@ -26,7 +27,10 @@ Options::Options()
       generic_quantization_bits(8),
       generic_deleted(false),
       compression_level(7),
-      use_metadata(false) {}
+      use_metadata(false)
+{
+  pos_quantization_bits=posQbits;
+}
 BackendOptimization::BackendOptimization():
   _max_keyframes_per_update(10),
   _floor_edge_stddev(10.0),
@@ -46,26 +50,6 @@ BackendOptimization::BackendOptimization():
    _receivedTransodom2map=Eigen::Isometry3d::Identity();
    _childToMaster=Eigen::Isometry3d::Identity();
    _frameId=0;
-
-   if (_options.pos_quantization_bits < 0) {
-     printf("Error: Position attribute cannot be skipped.\n");
-     exit(0);
-   }
-   const int speed = 10 - _options.compression_level;
-   // Setup encoder options.
-   if (_options.pos_quantization_bits > 0) {
-     _encoder.SetAttributeQuantization(draco::GeometryAttribute::POSITION,
-                                      _options.pos_quantization_bits);
-   }
-   if (_options.tex_coords_quantization_bits > 0) {
-     _encoder.SetAttributeQuantization(draco::GeometryAttribute::TEX_COORD,
-                                      _options.tex_coords_quantization_bits);
-   }
-   if (_options.generic_quantization_bits > 0) {
-     _encoder.SetAttributeQuantization(draco::GeometryAttribute::GENERIC,
-                                      _options.generic_quantization_bits);
-   }
-   _encoder.SetSpeedOptions(speed, speed);
 }
 bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
 {
@@ -79,7 +63,30 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
  _carId=private_nh.param<string>("carId","master");
  _calMethod=private_nh.param<string>("calMethod","distribution");
  _compressCloud=private_nh.param<string>("compressCloud","low");
+ _pos_quantization_bits=private_nh.param<int>("pos_quantization_bits",14);
  registration = select_registration_method(private_nh);
+ std::cout<<"_pos_quantization_bits"<<_pos_quantization_bits<<std::endl;
+ _options.reset(new Options(_pos_quantization_bits));
+ if (_options->pos_quantization_bits < 0) {
+   printf("Error: Position attribute cannot be skipped.\n");
+   exit(0);
+ }
+ const int speed = 10 - _options->compression_level;
+ std::cout<<"pos_quantization_bits"<<_options->pos_quantization_bits<<std::endl;
+ // Setup encoder options.
+ if (_options->pos_quantization_bits > 0) {
+   _encoder.SetAttributeQuantization(draco::GeometryAttribute::POSITION,
+                                    _options->pos_quantization_bits);
+ }
+ if (_options->tex_coords_quantization_bits > 0) {
+   _encoder.SetAttributeQuantization(draco::GeometryAttribute::TEX_COORD,
+                                    _options->tex_coords_quantization_bits);
+ }
+ if (_options->generic_quantization_bits > 0) {
+   _encoder.SetAttributeQuantization(draco::GeometryAttribute::GENERIC,
+                                    _options->generic_quantization_bits);
+ }
+ _encoder.SetSpeedOptions(speed, speed);
 
   _downSizeFilterSendCloud.setLeafSize(0.4, 0.4, 0.4);
 
@@ -98,19 +105,26 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
  // pointCloudEncoder.reset(new pcl::io::OctreePointCloudCompression<PointT>(profile,false));
  // pointCloudDecoder.reset(new pcl::io::OctreePointCloudCompression<PointT>());
 
-  _info_calculator.reset(new InformationMatrixCalculator(nh));
-  _loop_detector.reset(new LoopDetector(nh,false));
-  _child_loop_detector.reset(new LoopDetector(nh,false));
-  _childmaster_loop_detector.reset(new LoopDetector(nh,true));
+  _info_calculator.reset(new InformationMatrixCalculator(private_nh));
+  _loop_detector.reset(new LoopDetectorICP(private_nh,false));
+  _child_loop_detector.reset(new LoopDetectorICP(private_nh,false));
+  _childmaster_loop_detector.reset(new LoopDetectorICP(private_nh,true));
   graph_slam.reset(new GraphSLAM());
   _map_generate.reset(new MapCloudGenerate());
-  _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/rgb_points_cloud",2));
-  _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/rgb_points_cloud_odom",2));
+ // _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/rgb_points_cloud",2));
+ // _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/rgb_points_cloud_odom",2));
+  _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_cloud_surround",2));
+  _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
   _sub_flat_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_flat_cloud",2));
+  _sub_flatcorner_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_flatcorner_cloud",2));
+  _sub_outlier_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_outlier_cloud",2));
+
 
   _time_syn.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry,
-                  sensor_msgs::PointCloud2>(*_sub_laser_submap_pointcloud,*_sub_submap_odom,*_sub_flat_cloud,2));
-  _time_syn->registerCallback(boost::bind(&BackendOptimization::laser_cloud_odom_vecodom_callback, this, _1, _2,_3));
+                  sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,sensor_msgs::PointCloud2>
+                  (*_sub_laser_submap_pointcloud,*_sub_submap_odom,*_sub_flat_cloud,
+                   *_sub_flatcorner_cloud,*_sub_outlier_cloud,2));
+  _time_syn->registerCallback(boost::bind(&BackendOptimization::laser_cloud_odom_vecodom_callback, this, _1, _2,_3,_4,_5));
 
   //_sub_floor_coeffs=nh.subscribe<loam_velodyne::FloorCoeffs>("/laser_cloud_normal",32,&BackendOptimization::laser_floor_coeffs_callback,this);
 
@@ -463,7 +477,10 @@ void BackendOptimization::laser_submap_vecodom_callback(const loam_velodyne::Vec
 
 void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::PointCloud2ConstPtr& cloud,
                                        const nav_msgs::OdometryConstPtr& odom,
-                                       const sensor_msgs::PointCloud2ConstPtr& flat)
+                                       const sensor_msgs::PointCloud2ConstPtr& flat,
+                                       const sensor_msgs::PointCloud2ConstPtr& flatcorner,
+                                       const sensor_msgs::PointCloud2ConstPtr& outlier)
+
 {
   laser_cloud_time=odom->header.stamp;
   pcl::PointCloud<PointT>::Ptr laser_pointcloud(new pcl::PointCloud<PointT>());
@@ -472,14 +489,20 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   pcl::PointCloud<pcl::PointXYZI>::Ptr laser_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>());
   pcl::fromROSMsg(*flat,*laser_flat_cloud);
 
+  pcl::PointCloud<PointT>::Ptr laser_flatcorner_cloud(new pcl::PointCloud<PointT>());
+  pcl::fromROSMsg(*flatcorner,*laser_flatcorner_cloud);
+
+  pcl::PointCloud<PointT>::Ptr laser_outlier_cloud(new pcl::PointCloud<PointT>());
+  pcl::fromROSMsg(*outlier,*laser_outlier_cloud);
+
   geometry_msgs::Quaternion geo_quat=odom->pose.pose.orientation;
   Eigen::Quaterniond eig_qua(geo_quat.w,geo_quat.x,geo_quat.y,geo_quat.z);
   Eigen::Isometry3d pose=Eigen::Isometry3d::Identity();
 
   pose.rotate(eig_qua.toRotationMatrix());
   pose.pretranslate(Eigen::Vector3d(odom->pose.pose.position.x,odom->pose.pose.position.y,odom->pose.pose.position.z));
-
-  if(!_keyframe_update->update(pose,cloud->header.stamp,laser_pointcloud,laser_flat_cloud))
+  std::cout<<"debug 1"<<std::endl;
+  if(!_keyframe_update->update(pose,cloud->header.stamp,laser_pointcloud,laser_flat_cloud,laser_flatcorner_cloud,laser_outlier_cloud))
   {
     return;
   }
@@ -490,17 +513,21 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   key_frame->_accumulate_distance=_keyframe_update->get_accum_distance();
   key_frame->_stamp=_keyframe_update->get_prev_time();
   key_frame->_cloud=_keyframe_update->get_submap_cloud();
+  key_frame->_flatcorner_cloud=_keyframe_update->get_submap_flatcorner_cloud();
+  key_frame->_outlier_cloud=_keyframe_update->get_submap_outlier_cloud();
   key_frame->id=_frameId;
   _frameId++;
- // pcl::PointCloud<PointT>::Ptr send_pointcloud(new pcl::PointCloud<PointT>());
-  //_downSizeFilterSendCloud.setInputCloud(key_frame->_cloud);
-   //_downSizeFilterSendCloud.filter(*send_pointcloud);
+  pcl::PointCloud<PointT>::Ptr send_pointcloud(new pcl::PointCloud<PointT>());
+  _downSizeFilterSendCloud.setInputCloud(key_frame->_cloud);
+   _downSizeFilterSendCloud.filter(*send_pointcloud);
    //std::cout<<"send_pointcloud"<<send_pointcloud->size()<<std::endl;
+  //key_frame->_cloud=key_frame->_flatcorner_cloud;
    if(_frameId%1==0)
    {
      pcl::PointCloud<PointT>::Ptr test_cloud(new pcl::PointCloud<PointT>());
-       transportCloudToAnathorMachine( key_frame->_pose,key_frame->_cloud,key_frame->id,test_cloud);
+       transportCloudToAnathorMachine( key_frame->_pose,send_pointcloud,key_frame->id,test_cloud);
        //key_frame->_cloud=test_cloud;
+
        send_cloud_num++;
        std::cout<<"send_cloud_num"<<send_cloud_num<<std::endl;
    }
@@ -533,7 +560,7 @@ bool BackendOptimization::childNodeInit(pcl::PointCloud<PointT>::Ptr nowCloud)
   }
   return false;
 }
-void BackendOptimization::transportCloudToAnathorMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr test_cloud)
+void BackendOptimization::transportCloudToAnathorMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr& test_cloud)
 {
  /*  Eigen::Quaterniond rotationQ(pose.rotation());
    Eigen::Vector3d translation(pose.translation());
@@ -650,7 +677,7 @@ void BackendOptimization::transportCloudToAnathorMachine(const Eigen::Isometry3d
     std::copy(buffer.data(),buffer.data()+buffer.size(),sendByteMultiArray.data.begin()+poseByteMultiArray.data.size());
     _pubCompressCloud.publish(sendByteMultiArray);
     //  std::cout<<"debug 1"<<std::endl;
-    //decoder_image(sendByteMultiArray,test_cloud);
+   // decoder_image(sendByteMultiArray,test_cloud);
 }
 void BackendOptimization::decoder_image(std_msgs::ByteMultiArray received_image,pcl::PointCloud<PointT>::Ptr & testCloud)
 {
@@ -759,7 +786,6 @@ void BackendOptimization::decoder_image(std_msgs::ByteMultiArray received_image,
   key_frame->id=(uint64_t)decode_float[0];
   key_frame->_cloud=laser_pointcloud_decode;
   _dequeReceivedKeyFrames.push_back(key_frame);*/
-  std::cout<<"debug 3"<<std::endl;
   std::vector<float> decode_float;
   for(int i=0;i<8;i++)
   {
@@ -778,7 +804,6 @@ void BackendOptimization::decoder_image(std_msgs::ByteMultiArray received_image,
 
   std::vector<char> tem_convert(received_image.data.size()-32);
   std::copy(received_image.data.begin()+32,received_image.data.end(),tem_convert.begin());
-  std::cout<<"debug 2"<<std::endl;
   draco::DecoderBuffer decoder_buffer;
   decoder_buffer.Init(tem_convert.data(), tem_convert.size());
 
@@ -813,11 +838,11 @@ void BackendOptimization::decoder_image(std_msgs::ByteMultiArray received_image,
  dracoCloudToPCLCloud(*decoder_pc.get(),receivedCloud);
  std::cout<<"receivedCloud"<<receivedCloud->size()<<std::endl;
  testCloud=receivedCloud;
- std::shared_ptr<KeyFrame> key_frame(new KeyFrame());
+/* std::shared_ptr<KeyFrame> key_frame(new KeyFrame());
  key_frame->_pose=pose;
  key_frame->id=(uint64_t)decode_float[0];
  key_frame->_cloud=receivedCloud;
- _dequeReceivedKeyFrames.push_back(key_frame);
+ _dequeReceivedKeyFrames.push_back(key_frame);*/
 }
 std::unique_ptr<draco::PointCloud> BackendOptimization::pclCloudToDracoCloud(pcl::PointCloud<PointT>::ConstPtr cloud)
 {
@@ -886,12 +911,12 @@ bool BackendOptimization::calChildToMasterPose(pcl::PointCloud<PointT>::Ptr mast
   pcl::PointCloud<pcl::PointXYZI>::Ptr trans_cloud(new pcl::PointCloud<pcl::PointXYZI>);
   pcl::copyPointCloud(*masterCloud,*trans_cloud);
   registration->setInputTarget(trans_cloud);
-  double best_score = std::numeric_limits<double>::max();
+  double best_score = 10;
 
   std::cout << std::endl;
   std::cout << "init matching" << std::flush;
   auto t1 = ros::Time::now();
-  registration->setMaximumIterations(20);
+  registration->setMaximumIterations(100);
   pcl::PointCloud<pcl::PointXYZI>::Ptr aligned(new pcl::PointCloud<pcl::PointXYZI>());
   bool isValid=false;
   for(const auto& candidate : _dequeReceivedKeyFrames)
@@ -905,11 +930,12 @@ bool BackendOptimization::calChildToMasterPose(pcl::PointCloud<PointT>::Ptr mast
     std::cout << "." << std::flush;
 
     double score = registration->getFitnessScore();
+    std::cout<<"child to master score:"<<score<<std::endl;
     if(!registration->hasConverged() || score > best_score) {
       continue;
     }
     isValid=true;
-    std::cout<<"score"<<(ros::Time::now()-clo_start).toSec()*1000<<"ms"<<std::endl;
+    std::cout<<"time"<<(ros::Time::now()-clo_start).toSec()*1000<<"ms"<<std::endl;
     best_score = score;
     childToMaster =Eigen::Isometry3d(registration->getFinalTransformation().cast<double>());
     std::cout<<(ros::Time::now()-clo_start).toSec()*1000<<"ms"<<std::endl;
@@ -1110,6 +1136,7 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
       graph_slam->add_se3_edge(loop->key1->_node,loop->key2->_node,relative_pose,infomation);
     }
     std::cout<<"loop closure using time is:"<<(ros::Time::now()-start_loop).toSec()*1000<<"ms"<<std::endl;
+    start_loop=ros::Time::now();
     if(_calMethod=="distribution")
     {
       std::cout<<"distribution"<<std::endl;
@@ -1124,7 +1151,6 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
         return key_frame;
       });
       std::vector<Loop::Ptr> receivedDetectLoops=_child_loop_detector->detect(_receivedKeyFrames,_newReceivedKeyFrames);
-      std::copy(_newReceivedKeyFrames.begin(),_newReceivedKeyFrames.end(),std::back_inserter(_receivedKeyFrames));
        for(int i=0;i<receivedDetectLoops.size();i++)
        {
          Loop::Ptr loop=receivedDetectLoops[i];
@@ -1143,6 +1169,7 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
          Eigen::MatrixXd infomation= _info_calculator->calc_information_matrix(loop->key1->_cloud,loop->key2->_cloud,relative_pose);
          graph_slam->add_se3_edge(loop->key1->_node,loop->key2->_node,relative_pose,infomation);
        }
+       std::copy(_newReceivedKeyFrames.begin(),_newReceivedKeyFrames.end(),std::back_inserter(_receivedKeyFrames));
        graph_slam->optimize();
        pubPoseGraphTochild();
     }
