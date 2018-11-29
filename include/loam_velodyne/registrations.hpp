@@ -14,6 +14,7 @@ namespace loam {
  */
 using PointT=pcl::PointXYZI;
 boost::shared_ptr<pcl::Registration<PointT, PointT>> select_registration_method(ros::NodeHandle& pnh);
+boost::shared_ptr<pcl::Registration<PointT, PointT>> select_init_registration_method(ros::NodeHandle& pnh);
 
 }
 

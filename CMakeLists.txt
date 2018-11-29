@@ -59,6 +59,7 @@ add_service_files(
   FILES
   SaveMap.srv
   GlobalMap.srv
+  ChildToMaster.srv
 )
 generate_messages(
  DEPENDENCIES
@@ -125,6 +126,11 @@ target_link_libraries(backendOptim
     ${PCL_LIBRARIES}
     loam)
 
+add_executable(register_test tests/register_test.cpp)
+target_link_libraries(register_test
+    ${catkin_LIBRARIES}
+    ${PCL_LIBRARIES}
+    loam)
 #if (CATKIN_ENABLE_TESTING)
 #  find_package(rostest REQUIRED)
 #  # TODO: Download test data

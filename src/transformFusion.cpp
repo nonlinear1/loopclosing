@@ -33,6 +33,7 @@
 #include "loam_velodyne/utility.h"
 #include<Eigen/Geometry>
 #include<visualization_msgs/Marker.h>
+#include<loam_velodyne/ChildToMaster.h>
 class TransformFusion{
 
 private:
@@ -44,7 +45,8 @@ private:
     ros::Subscriber subLaserOdometry;
     ros::Subscriber subOdomAftMapped;
     ros::Subscriber subLaserOdometry_inter;
-  
+
+    ros::ServiceServer server;
 
     nav_msgs::Odometry laserOdometry2;
     tf::StampedTransform laserOdometryTrans2;
@@ -66,6 +68,7 @@ private:
     Eigen::Isometry3d befLooptransformSum;
     Eigen::Isometry3d befLooptransformBefMapped;
     Eigen::Isometry3d beftransformAftMapped;
+    Eigen::Isometry3d childToMaster;
 
     std_msgs::Header currentHeader;
 
@@ -78,6 +81,7 @@ public:
         subLaserOdometry_inter = nh.subscribe<nav_msgs::Odometry>("/aft_mapped_to_init_inter", 5, &TransformFusion::odomAftMappedHandler, this);
         subOdomAftMapped = nh.subscribe<nav_msgs::Odometry>("/trans2map", 5, &TransformFusion::loopOptimHandler, this);
         pubVisOdom=nh.advertise<visualization_msgs::Marker>("/odom_marker",2);
+        server=nh.advertiseService("/getchildToMasterTransform",&TransformFusion::getchildToMasterTransform,this);
         laserOdometry2.header.frame_id = "/camera_init";
         laserOdometry2.child_frame_id = "/camera";
 
@@ -102,6 +106,20 @@ public:
         befLooptransformSum=Eigen::Isometry3d::Identity();
         befLooptransformBefMapped=Eigen::Isometry3d::Identity();
         beftransformAftMapped=Eigen::Isometry3d::Identity();
+        childToMaster=Eigen::Isometry3d::Identity();
+    }
+
+    bool getchildToMasterTransform(loam_velodyne::ChildToMasterRequest& req,loam_velodyne::ChildToMasterResponse& res)
+    {
+      Eigen::Quaterniond eig_qua(req.qw,req.qx,req.qy,req.qz);
+      Eigen::Isometry3d pose=Eigen::Isometry3d::Identity();
+
+      pose.rotate(eig_qua.toRotationMatrix());
+      pose.pretranslate(Eigen::Vector3d(req.x,req.y,req.z));
+      childToMaster=pose;
+      std::cout<<"childToMaster"<<childToMaster.matrix()<<std::endl;
+      res.success=true;
+      return true;
     }
 
     void transformAssociateToMap()
@@ -219,7 +237,7 @@ public:
         geoQuat = tf::createQuaternionMsgFromRollPitchYaw
                   (transformMapped[2], -transformMapped[0], -transformMapped[1]);*/
 
-        Eigen::Isometry3d aftloopOptim=loopOptimtrans2map*beftransformAftMapped*befLooptransformBefMapped.inverse()*befLooptransformSum;
+        Eigen::Isometry3d aftloopOptim=loopOptimtrans2map*childToMaster*beftransformAftMapped*befLooptransformBefMapped.inverse()*befLooptransformSum;
         Eigen::Quaterniond aftloopOptimQuad(aftloopOptim.rotation());
         Eigen::Vector3d translate=aftloopOptim.translation();
 

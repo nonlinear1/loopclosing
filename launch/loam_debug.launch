@@ -51,8 +51,8 @@
     <param name="accum_distance_thresh" value="8.0" />
     <param name="min_edge_interval" value="5.0" />
     <!--- 0.5-->
-    <param name="fitness_score_thresh" value="3" />
-    <param name="childmaster_fitness_score_thresh" value="8" />
+    <param name="fitness_score_thresh" value="1" />
+    <param name="childmaster_fitness_score_thresh" value="1" />
     <param name="search_radius_num" value="25" />
     <!-- cloud matching params -->
     <param name="registration_method" value="NDT_OMP" />
@@ -67,6 +67,15 @@
     <param name="map_cloud_update_interval" value="10.0" />
     <!--compress cloud -->
     <param name="compressCloud" value="low" />
+    <!--child master register-->
+    <param name="init_received_dequeue_lengh" value="10" />
+    <param name="init_local_dequeue_lengh" value="6" />
+    <param name="init_search_radius_num" value="3" />
+    <param name="init_registration_method" value="NDT_OMP" />
+    <param name="init_ndt_resolution" value="6" />
+    <param name="init_ndt_num_threads" value="0" />
+    <param name="init_ndt_nn_search_method" value="DIRECT7" />
+    <param name="init_fitness_score_thresh" value="1" />
   </node>
 
   <group if="$(arg rviz)">

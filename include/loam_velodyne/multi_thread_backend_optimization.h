@@ -79,14 +79,16 @@ public:
   g2o::VertexPlane* select_global_plane_node(const Eigen::Isometry3d& pose_now,const Eigen::Vector4d& plane_now);
   void transportCloudToAnathorMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr& test_cloud);
   void decoder_image(std_msgs::ByteMultiArray received_image,pcl::PointCloud<PointT>::Ptr& testCloud);
-  bool calChildToMasterPose(pcl::PointCloud<PointT>::Ptr masterCloud,Eigen::Isometry3d& childToMaster);
-  bool childNodeInit(pcl::PointCloud<PointT>::Ptr nowCloud);
+  bool calChildToMasterPose();
+  bool childNodeInit();
   void pubPoseGraphTochild();
   void receivedPoseGraph(const std_msgs::ByteMultiArrayConstPtr& poseGraph);
   void decodereceivedPosegraph(const std_msgs::ByteMultiArray poseGraph);
   void float2Pose(const std_msgs::ByteMultiArray& posebegin,std::vector<double>& posegraph);
   std::unique_ptr<draco::PointCloud> pclCloudToDracoCloud(pcl::PointCloud<PointT>::ConstPtr cloud);
   void dracoCloudToPCLCloud(const draco::PointCloud& cloud,pcl::PointCloud<PointT>::Ptr convert_cloud);
+  void pubedlishChilsTomasterPose();
+  void pubAnathorMachineVisOdom(const Eigen::Isometry3d& pose);
   //keyframe variable
   std::vector<std::shared_ptr<KeyFrame>> _keyFrames;
   std::vector<std::shared_ptr<KeyFrame>> _new_keyFrames;
@@ -118,6 +120,8 @@ public:
   std::unique_ptr<LoopDetectorICP> _loop_detector;
   std::unique_ptr<LoopDetectorICP> _child_loop_detector;
   std::unique_ptr<LoopDetectorICP> _childmaster_loop_detector;
+  std::unique_ptr<LoopDetectorICP> _masterchild_loop_detector;
+
 
   //define timer to execute graph optimization and publish map pointcloud
   ros::Timer _optimization_timer;
@@ -163,9 +167,8 @@ public:
   std::vector<std::shared_ptr<KeyFrame>> _newReceivedKeyFrames;
   std::deque<std::shared_ptr<KeyFrame>> _dequeReceivedKeyFrames;
   std::vector<std::shared_ptr<KeyFrame>> _receivedKeyFrames;
-  std::string _compressCloud;
   //
-  std::string _carId="childNode";
+  std::string _carId="child";
   std::string _calMethod="distribution";
   pcl::Registration<pcl::PointXYZI, pcl::PointXYZI>::Ptr registration;
   Eigen::Isometry3d _childToMaster;
@@ -178,8 +181,6 @@ public:
   //publish and subscribe pose graph
   ros::Publisher _pubPoseGraph;
   ros::Subscriber _subPoseGraph;
-  //std::vector<std::shared_ptr<KeyFrame>> _masterPosegraph;
-  //std::vector<std::shared_ptr<KeyFrame>> _childPosegraph;
   std::mutex _poseGraphMutex;
   std::unordered_map<uint64_t, KeyFrame::Ptr> _masterPoseGraphHash;
   std::unordered_map<uint64_t, KeyFrame::Ptr> _childPoseGraphHash;
@@ -191,6 +192,19 @@ public:
   int _pos_quantization_bits;
   std::unique_ptr<Options> _options;
   draco::Encoder _encoder;
+  std::vector<KeyFrame::Ptr> _initLocalkeyframe;
+
+  int init_received_dequeue_lengh;
+  int init_local_dequeue_lengh;
+  int init_search_radius_num;
+  double init_fitness_score_thresh;
+  pcl::VoxelGrid<pcl::PointXYZI> _downloadInitSourceCloud;
+  pcl::VoxelGrid<pcl::PointXYZI> _downloadInitTargetCloud;
+  ros::ServiceClient childToMasterClient;
+  bool pubedlishChilsTomasterPoseFlag;
+  ros::Publisher pubAnathorVisOdom;
+
+  ros::Publisher pubVisOdom_debug;
 };
 typedef union
 {

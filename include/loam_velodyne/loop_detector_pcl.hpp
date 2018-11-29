@@ -67,11 +67,11 @@ private:
    */
   int64_t find_candidates(const std::vector<KeyFrame::Ptr>& keyframes, const KeyFrame::Ptr& new_keyframe) const {
     // too close to the last registered loop edge
-   if(child_master_flag)
+  /* if(child_master_flag)
    {
        std::cout<<"new_keyframe->_accumulate_distance"<<new_keyframe->_accumulate_distance<<std::endl;
        std::cout<<"last_edge_accum_distance"<<last_edge_accum_distance<<" "<<"distance_from_last_edge_thresh"<<distance_from_last_edge_thresh<<std::endl;
-   }
+   }*/
    if(new_keyframe->_accumulate_distance - last_edge_accum_distance < distance_from_last_edge_thresh) {
       return -1;
     }
@@ -99,7 +99,7 @@ private:
       double dist=std::sqrt(std::pow(pos1(0)-pos2(0),2)+std::pow(pos1(2)-pos2(2),2));
       if(child_master_flag)
       {
-          std::cout<<"distance diff:"<<dist<<std::endl;
+         // std::cout<<"distance diff:"<<dist<<std::endl;
       }
       if(child_master_flag)
       {
@@ -182,7 +182,10 @@ private:
    registration->align(*aligned,guess);
    std::cout<<"loop using time is:"<<(ros::Time::now()-begin).toSec()<<std::endl;
    double score = registration->getFitnessScore();
-   std::cout<<"loop score"<<score<<std::endl;
+   if(child_master_flag)
+      std::cout<<"child master loop score:"<<score<<std::endl;
+   else
+     std::cout<<"loop score:"<<score<<std::endl;
    if(child_master_flag)
       fitness_score_thresh=childmaster_fitness_score_thresh;
    if(!registration->hasConverged() || score > fitness_score_thresh) {

@@ -79,6 +79,14 @@ Visualization Manager:
         odometry: true
       Queue Size: 100
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /anathor_odom_marker
+      Name: Marker
+      Namespaces:
+        odometry: true
+      Queue Size: 100
+      Value: true
     - Angle Tolerance: 0.100000001
       Class: rviz/Odometry
       Covariance:
