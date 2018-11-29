@@ -63,9 +63,7 @@ public:
 
   void laser_cloud_odom_vecodom_callback(const sensor_msgs::PointCloud2ConstPtr& cloud,
                                          const nav_msgs::OdometryConstPtr& odom,
-                                         const sensor_msgs::PointCloud2ConstPtr& flat,
-                                         const sensor_msgs::PointCloud2ConstPtr& flatcorner,
-                                         const sensor_msgs::PointCloud2ConstPtr& outlier);
+                                         const sensor_msgs::PointCloud2ConstPtr& flat);
   void received_cloud_callback(const std_msgs::ByteMultiArrayConstPtr& cloudAndPosePtr);
   std::vector<std::string> split(const std::string& str, const std::string& delim);
   bool flush_floor_queue();
@@ -77,7 +75,7 @@ public:
   bool mapvis_info_cllback(loam_velodyne::GlobalMapRequest& req,loam_velodyne::GlobalMapResponse& res);
   visualization_msgs::MarkerArray creat_trajectory(const ros::Time& stamp);
   g2o::VertexPlane* select_global_plane_node(const Eigen::Isometry3d& pose_now,const Eigen::Vector4d& plane_now);
-  void transportCloudToAnathorMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr& test_cloud);
+  void transportCloudToAnotherMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr& test_cloud);
   void decoder_image(std_msgs::ByteMultiArray received_image,pcl::PointCloud<PointT>::Ptr& testCloud);
   bool calChildToMasterPose();
   bool childNodeInit();
@@ -88,7 +86,7 @@ public:
   std::unique_ptr<draco::PointCloud> pclCloudToDracoCloud(pcl::PointCloud<PointT>::ConstPtr cloud);
   void dracoCloudToPCLCloud(const draco::PointCloud& cloud,pcl::PointCloud<PointT>::Ptr convert_cloud);
   void pubedlishChilsTomasterPose();
-  void pubAnathorMachineVisOdom(const Eigen::Isometry3d& pose);
+  void pubAnotherMachineVisOdom(const Eigen::Isometry3d& pose);
   //keyframe variable
   std::vector<std::shared_ptr<KeyFrame>> _keyFrames;
   std::vector<std::shared_ptr<KeyFrame>> _new_keyFrames;
@@ -107,10 +105,8 @@ public:
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_laser_submap_pointcloud;
   std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> _sub_submap_odom;
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_flat_cloud;
-  std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_flatcorner_cloud;
-  std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> _sub_outlier_cloud;
   std::unique_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry,
-  sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,sensor_msgs::PointCloud2>> _time_syn;
+  sensor_msgs::PointCloud2>> _time_syn;
 
   ros::Subscriber _sub_floor_coeffs;
 
@@ -136,8 +132,10 @@ public:
   //pointcloud publish and save
   std::mutex _snapshot_cloud_mutex;
   std::vector<KeyFrameSnapshot::Ptr> _snapshot_cloud;
+  std::vector<KeyFrameSnapshot::Ptr> _another_snapshot_cloud;
   std::unique_ptr<MapCloudGenerate> _map_generate;
-  ros::Publisher _pub_map_point;
+  ros::Publisher _pubRGBMap;
+  ros::Publisher _pubFlatMap;
   ros::ServiceServer _map_save_server;
   ros::ServiceServer _map_info_server;
   double _display_distance_threash;
@@ -202,7 +200,7 @@ public:
   pcl::VoxelGrid<pcl::PointXYZI> _downloadInitTargetCloud;
   ros::ServiceClient childToMasterClient;
   bool pubedlishChilsTomasterPoseFlag;
-  ros::Publisher pubAnathorVisOdom;
+  ros::Publisher pubAnotherVisOdom;
 
   ros::Publisher pubVisOdom_debug;
 };

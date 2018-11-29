@@ -199,62 +199,6 @@ private:
 
    last_edge_accum_distance = new_keyframe->_accumulate_distance;
    return std::make_shared<Loop>(keyframes[condidate_index], new_keyframe,relative_pose);
-
-    /*   if(candidate_keyframes.empty()) {
-      return nullptr;
-    }
-    pcl::PointCloud<PointT>::Ptr trans_cloud(new pcl::PointCloud<PointT>);
-    pcl::copyPointCloud(*(new_keyframe->_cloud),*trans_cloud);
-    registration->setInputTarget(trans_cloud);
-    double best_score = std::numeric_limits<double>::max();
-    KeyFrame::Ptr best_matched;
-    Eigen::Matrix4d relative_pose;
-
-    std::cout << std::endl;
-    std::cout << "--- loop detection ---" << std::endl;
-    std::cout << "num_candidates: " << candidate_keyframes.size() << std::endl;
-    std::cout << "matching" << std::flush;
-    auto t1 = ros::Time::now();
-    registration->setMaximumIterations(20);
-    pcl::PointCloud<PointT>::Ptr aligned(new pcl::PointCloud<PointT>());
-    for(const auto& candidate : candidate_keyframes) {
-      ros::Time clo_start=ros::Time::now();
-      pcl::PointCloud<PointT>::Ptr trans_src_cloud(new pcl::PointCloud<PointT>);
-      //pcl::PointCloud<PointT>::Ptr filter_src_cloud(new pcl::PointCloud<PointT>);
-      pcl::copyPointCloud(*(candidate->_cloud),*trans_src_cloud);
-     // _downSizeFilterCloud.setInputCloud(trans_src_cloud);
-      //_downSizeFilterCloud.filter(*filter_src_cloud);
-      registration->setInputSource(trans_src_cloud);
-      Eigen::Matrix4f guess= (new_keyframe->_node->estimate().inverse() * candidate->_node->estimate()).matrix().cast<float>();
-      //guess(2, 3) = 0.0;
-      registration->align(*aligned, guess);
-      std::cout << "." << std::flush;
-
-      double score = registration->getFitnessScore();
-      if(!registration->hasConverged() || score > best_score) {
-        continue;
-      }
-      std::cout<<"score"<<(ros::Time::now()-clo_start).toSec()*1000<<"ms"<<std::endl;
-      best_score = score;
-      best_matched = candidate;
-      relative_pose = registration->getFinalTransformation().cast<double>();
-      std::cout<<(ros::Time::now()-clo_start).toSec()*1000<<"ms"<<std::endl;
-    }
-
-    auto t2 = ros::Time::now();
-    std::cout << " done" << std::endl;
-    std::cout << "best_score: " << boost::format("%.3f") % best_score << "    time: " << boost::format("%.3f") % (t2 - t1).toSec() << "[sec]" << std::endl;
-
-    if(best_score > fitness_score_thresh) {
-      std::cout << "loop not found..." << std::endl;
-      return nullptr;
-    }
-
-    std::cout << "loop found!!" << std::endl;
-    std::cout << "relpose: " << relative_pose.block<3, 1>(0, 3) << " - " << Eigen::Quaterniond(relative_pose.block<3, 3>(0, 0)).coeffs().transpose() << std::endl;
-
-    last_edge_accum_distance = new_keyframe->_accumulate_distance;
-    return std::make_shared<Loop>(new_keyframe, best_matched, relative_pose);*/
   }
 
 private:

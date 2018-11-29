@@ -1,0 +1,24 @@
+在multi_thread_backend_optimization.cpp内注释
+//_sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/rgb_points_cloud",2));
+//_sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/rgb_points_cloud_odom",2));
+打开
+_sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_cloud_surround",2));
+_sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
+修改    
+<param name="carId" value="child" />
+去掉
+<node pkg="loam_velodyne" type="laserImage_node" name="laserImage_node" output="screen">
+    <!-- 1 is right,2 is back, 3 is up,4 is left-->
+    <param name="camera_number" value="4" />
+    <param name="intrinsic" value="$(find loam_velodyne)/config/fisheye.ini" />
+    <param name="extrinsic1" value="$(find loam_velodyne)/config/extrinsic1.yaml" />
+    <param name="extrinsic2" value="$(find loam_velodyne)/config/extrinsic2.yaml" />
+    <param name="extrinsic3" value="$(find loam_velodyne)/config/extrinsic3.yaml" />
+    <param name="extrinsic4" value="$(find loam_velodyne)/config/extrinsic4.yaml" />
+    <param name="camera1_pre_theta" value="180" />
+    <param name="camera2_pre_theta" value="90" />
+    <param name="camera3_pre_theta" value="0" />
+    <param name="camera4_pre_theta" value="-90" />
+    <!--resize image-->
+    <param name="resizeImageTimes" value="4" />
+</node>

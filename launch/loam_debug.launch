@@ -68,7 +68,7 @@
     <!--compress cloud -->
     <param name="compressCloud" value="low" />
     <!--child master register-->
-    <param name="init_received_dequeue_lengh" value="10" />
+    <param name="init_received_dequeue_lengh" value="15" />
     <param name="init_local_dequeue_lengh" value="6" />
     <param name="init_search_radius_num" value="3" />
     <param name="init_registration_method" value="NDT_OMP" />

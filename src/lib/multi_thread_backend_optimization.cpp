@@ -109,30 +109,27 @@ bool BackendOptimization::setup(ros::NodeHandle& nh,ros::NodeHandle&private_nh )
 
   graph_slam.reset(new GraphSLAM());
   _map_generate.reset(new MapCloudGenerate());
- // _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/rgb_points_cloud",2));
- // _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/rgb_points_cloud_odom",2));
-  _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_cloud_surround",2));
-  _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
+  _sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/rgb_points_cloud",2));
+  _sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/rgb_points_cloud_odom",2));
+  //_sub_laser_submap_pointcloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_cloud_surround",2));
+  //_sub_submap_odom.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh,"/aft_mapped_to_init",2));
   _sub_flat_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_flat_cloud",2));
-  _sub_flatcorner_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_flatcorner_cloud",2));
-  _sub_outlier_cloud.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh,"/laser_outlier_cloud",2));
-
 
   _time_syn.reset(new message_filters::TimeSynchronizer<sensor_msgs::PointCloud2,nav_msgs::Odometry,
-                  sensor_msgs::PointCloud2,sensor_msgs::PointCloud2,sensor_msgs::PointCloud2>
-                  (*_sub_laser_submap_pointcloud,*_sub_submap_odom,*_sub_flat_cloud,
-                   *_sub_flatcorner_cloud,*_sub_outlier_cloud,2));
-  _time_syn->registerCallback(boost::bind(&BackendOptimization::laser_cloud_odom_vecodom_callback, this, _1, _2,_3,_4,_5));
+                  sensor_msgs::PointCloud2>
+                  (*_sub_laser_submap_pointcloud,*_sub_submap_odom,*_sub_flat_cloud,2));
+  _time_syn->registerCallback(boost::bind(&BackendOptimization::laser_cloud_odom_vecodom_callback, this, _1, _2,_3));
 
   //_sub_floor_coeffs=nh.subscribe<loam_velodyne::FloorCoeffs>("/laser_cloud_normal",32,&BackendOptimization::laser_floor_coeffs_callback,this);
 
   _optimization_timer=nh.createTimer(ros::Duration(_graph_update_interval),&BackendOptimization::graph_optimization_timer_callback,this);
   _pub_map_pointcloud=nh.createTimer(ros::Duration(_map_cloud_update_interval),&BackendOptimization::pub_map_pointcloud_timer_callback,this);
-  _pub_map_point=nh.advertise<sensor_msgs::PointCloud2>("/map_points",1);
+  _pubRGBMap=nh.advertise<sensor_msgs::PointCloud2>("/rgb_map_cloud",1);
+  _pubFlatMap=nh.advertise<sensor_msgs::PointCloud2>("/flat_map_cloud",1);
   if(_carId=="child")
     _optimization_timer.stop();
 
-  pubAnathorVisOdom=nh.advertise<visualization_msgs::Marker>("/anathor_odom_marker",2);
+  pubAnotherVisOdom=nh.advertise<visualization_msgs::Marker>("/another_odom_marker",2);
   _pubPoseGraph=nh.advertise<std_msgs::ByteMultiArray>("/poseGraphToChild",3);
   _subPoseGraph=nh.subscribe<std_msgs::ByteMultiArray>("/poseGraphFromMaster",3,&BackendOptimization::receivedPoseGraph,this);
 
@@ -175,14 +172,14 @@ void BackendOptimization::pubedlishChilsTomasterPose()
     }
   }
 }
-void BackendOptimization::pubAnathorMachineVisOdom(const Eigen::Isometry3d& pose)
+void BackendOptimization::pubAnotherMachineVisOdom(const Eigen::Isometry3d& pose)
 {
   Eigen::Isometry3d updatePose=_receivedTransodom2map*pose;
   Eigen::Vector3d translation=updatePose.translation();
   visualization_msgs::Marker sphere_marker;
   sphere_marker.header.frame_id = "/camera_init";
   sphere_marker.header.stamp = ros::Time::now();
-  sphere_marker.ns = "Anathorodometry";
+  sphere_marker.ns = "Anotherodometry";
   sphere_marker.id = 0;
   sphere_marker.type = visualization_msgs::Marker::SPHERE;
   sphere_marker.pose.position.x = translation(0);
@@ -194,7 +191,7 @@ void BackendOptimization::pubAnathorMachineVisOdom(const Eigen::Isometry3d& pose
   sphere_marker.scale.z =5;
   sphere_marker.color.b = 1.0;
   sphere_marker.color.a = 0.3;
-  pubAnathorVisOdom.publish(sphere_marker);
+  pubAnotherVisOdom.publish(sphere_marker);
 }
 //decode received cloud
 void BackendOptimization::received_cloud_callback(const std_msgs::ByteMultiArrayConstPtr& cloudAndPosePtr)
@@ -216,7 +213,7 @@ void BackendOptimization::received_cloud_callback(const std_msgs::ByteMultiArray
 
   pose.rotate(eig_qua.toRotationMatrix());
   pose.pretranslate(Eigen::Vector3d(decode_float[5],decode_float[6],decode_float[7]));
-  pubAnathorMachineVisOdom(pose);
+  pubAnotherMachineVisOdom(pose);
   std::vector<char> tem_convert(cloudAndPosePtr->data.size()-32);
   std::copy(cloudAndPosePtr->data.begin()+32,cloudAndPosePtr->data.end(),tem_convert.begin());
   draco::DecoderBuffer decoder_buffer;
@@ -519,9 +516,7 @@ void BackendOptimization::laser_submap_vecodom_callback(const loam_velodyne::Vec
 
 void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::PointCloud2ConstPtr& cloud,
                                        const nav_msgs::OdometryConstPtr& odom,
-                                       const sensor_msgs::PointCloud2ConstPtr& flat,
-                                       const sensor_msgs::PointCloud2ConstPtr& flatcorner,
-                                       const sensor_msgs::PointCloud2ConstPtr& outlier)
+                                       const sensor_msgs::PointCloud2ConstPtr& flat)
 
 {
   laser_cloud_time=odom->header.stamp;
@@ -531,12 +526,6 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   pcl::PointCloud<pcl::PointXYZI>::Ptr laser_flat_cloud(new pcl::PointCloud<pcl::PointXYZI>());
   pcl::fromROSMsg(*flat,*laser_flat_cloud);
 
-  pcl::PointCloud<PointT>::Ptr laser_flatcorner_cloud(new pcl::PointCloud<PointT>());
-  pcl::fromROSMsg(*flatcorner,*laser_flatcorner_cloud);
-
-  pcl::PointCloud<PointT>::Ptr laser_outlier_cloud(new pcl::PointCloud<PointT>());
-  pcl::fromROSMsg(*outlier,*laser_outlier_cloud);
-
   geometry_msgs::Quaternion geo_quat=odom->pose.pose.orientation;
   Eigen::Quaterniond eig_qua(geo_quat.w,geo_quat.x,geo_quat.y,geo_quat.z);
   Eigen::Isometry3d pose=Eigen::Isometry3d::Identity();
@@ -544,7 +533,7 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   pose.rotate(eig_qua.toRotationMatrix());
   pose.pretranslate(Eigen::Vector3d(odom->pose.pose.position.x,odom->pose.pose.position.y,odom->pose.pose.position.z));
 
-  if(!_keyframe_update->update(pose,cloud->header.stamp,laser_pointcloud,laser_flat_cloud,laser_flatcorner_cloud,laser_outlier_cloud))
+  if(!_keyframe_update->update(pose,cloud->header.stamp,laser_pointcloud,laser_flat_cloud))
   {
     return;
   }
@@ -555,8 +544,6 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
     init_key_frame->_accumulate_distance=_keyframe_update->get_accum_distance();
     init_key_frame->_stamp=_keyframe_update->get_prev_time();
     init_key_frame->_cloud=_keyframe_update->get_submap_cloud();
-    init_key_frame->_flatcorner_cloud=_keyframe_update->get_submap_flatcorner_cloud();
-    init_key_frame->_outlier_cloud=_keyframe_update->get_submap_outlier_cloud();
     _keyframe_update ->param_update();
     _initLocalkeyframe.push_back(init_key_frame);
     childNodeInit();
@@ -568,8 +555,6 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   key_frame->_accumulate_distance=_keyframe_update->get_accum_distance();
   key_frame->_stamp=_keyframe_update->get_prev_time();
   key_frame->_cloud=_keyframe_update->get_submap_cloud();
-  key_frame->_flatcorner_cloud=_keyframe_update->get_submap_flatcorner_cloud();
-  key_frame->_outlier_cloud=_keyframe_update->get_submap_outlier_cloud();
   key_frame->id=_frameId;
   _frameId++;
   pcl::PointCloud<PointT>::Ptr send_pointcloud(new pcl::PointCloud<PointT>());
@@ -580,7 +565,7 @@ void BackendOptimization::laser_cloud_odom_vecodom_callback(const sensor_msgs::P
   // if(_frameId%1==0)
   // {
      pcl::PointCloud<PointT>::Ptr test_cloud(new pcl::PointCloud<PointT>());
-       transportCloudToAnathorMachine( key_frame->_pose,send_pointcloud,key_frame->id,test_cloud);
+       transportCloudToAnotherMachine( key_frame->_pose,send_pointcloud,key_frame->id,test_cloud);
        //key_frame->_cloud=test_cloud;
 
        send_cloud_num++;
@@ -617,11 +602,11 @@ bool BackendOptimization::childNodeInit()
   }
   return false;
 }
-void BackendOptimization::transportCloudToAnathorMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr& test_cloud)
+void BackendOptimization::transportCloudToAnotherMachine(const Eigen::Isometry3d& pose,pcl::PointCloud<PointT>::ConstPtr cloud,uint64_t keyframeId,pcl::PointCloud<PointT>::Ptr& test_cloud)
 {
  /*  Eigen::Quaterniond rotationQ(pose.rotation());
    Eigen::Vector3d translation(pose.translation());
-   //transport cloud to anathor machine
+   //transport cloud to another machine
    std::stringstream compressCloud;
    std::string dataAndPoseStr,dataAndposeLengthStr;
    dataAndPoseStr+=boost::lexical_cast<std::string>(float(keyframeId))+" ";
@@ -1287,13 +1272,14 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
   }
   _new_keyFrames.clear();
   _newReceivedKeyFrames.clear();
-  std::vector<KeyFrameSnapshot::Ptr> snapshot(_keyFrames.size()+_receivedKeyFrames.size());//+_receivedKeyFrames.size()
+  std::vector<KeyFrameSnapshot::Ptr> snapshot(_keyFrames.size());//+_receivedKeyFrames.size()
+  std::vector<KeyFrameSnapshot::Ptr> another_snapshot(_receivedKeyFrames.size());//+_receivedKeyFrames.size()
   std::transform(_keyFrames.begin(),_keyFrames.end(),snapshot.begin(),[](KeyFrame::Ptr key_frame)
   {
     KeyFrameSnapshot::Ptr tem_snapshot(new KeyFrameSnapshot(key_frame));
     return tem_snapshot;
   });
-  std::transform(_receivedKeyFrames.begin(),_receivedKeyFrames.end(),snapshot.begin()+_keyFrames.size(),[](KeyFrame::Ptr key_frame)
+  std::transform(_receivedKeyFrames.begin(),_receivedKeyFrames.end(),another_snapshot.begin(),[](KeyFrame::Ptr key_frame)
   {
     KeyFrameSnapshot::Ptr tem_snapshot(new KeyFrameSnapshot(key_frame));
     return tem_snapshot;
@@ -1326,6 +1312,7 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
 
   _snapshot_cloud_mutex.lock();
   _snapshot_cloud.swap(snapshot);
+  _another_snapshot_cloud.swap(another_snapshot);
   _snapshot_cloud_mutex.unlock();
   if(_vis_pub.getNumSubscribers())
   {
@@ -1336,29 +1323,51 @@ void BackendOptimization::graph_optimization_timer_callback(const ros::TimerEven
 void BackendOptimization::pub_map_pointcloud_timer_callback(const ros::TimerEvent& event)
 {
   std::vector<KeyFrameSnapshot::Ptr> snapshot;
+  std::vector<KeyFrameSnapshot::Ptr> another_snapshot;
   _snapshot_cloud_mutex.lock();
   snapshot=_snapshot_cloud;
+  another_snapshot=_another_snapshot_cloud;
   _snapshot_cloud_mutex.unlock();
   ros::Time start=ros::Time::now();
-  pcl::PointCloud<PointT>::Ptr cloud=_map_generate->generate(snapshot,_display_resolution,_display_distance_threash,_is_global_map);
-  if(!cloud)
+  pcl::PointCloud<PointT>::Ptr colorCloud=nullptr;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr flatCloud=nullptr;
+  if(_carId=="master")
   {
-    std::cout<<"cloud is empty"<<std::endl;
+    colorCloud=_map_generate->generateRGBCloud(snapshot,_display_resolution,_display_distance_threash,_is_global_map);
+    flatCloud=_map_generate->generateFlatCloud(another_snapshot,_display_resolution,_display_distance_threash,_is_global_map);
+  }
+  else
+  {
+    colorCloud=_map_generate->generateRGBCloud(another_snapshot,_display_resolution,_display_distance_threash,_is_global_map);
+    flatCloud=_map_generate->generateFlatCloud(snapshot,_display_resolution,_display_distance_threash,_is_global_map);
+  }
+  if(!colorCloud)
+  {
+    std::cout<<"color cloud is empty"<<std::endl;
     return ;
   }
-  std::cout<<"map size"<<cloud->size()<<std::endl;
   std::cout<<"publish map time:"<<(ros::Time::now()-start).toSec()*1000<<"ms"<<std::endl;
-  cloud->header.stamp=snapshot.back()->_cloud->header.stamp;
-  cloud->header=snapshot.back()->_cloud->header;
-  sensor_msgs::PointCloud2 cloud_msg;
-  pcl::toROSMsg(*cloud,cloud_msg);
-  cloud_msg.header.frame_id="/camera_init";
-  cloud_msg.header.stamp=ros::Time::now();
-  _pub_map_point.publish(cloud_msg);
+  sensor_msgs::PointCloud2 color_cloud_msg;
+  pcl::toROSMsg(*colorCloud,color_cloud_msg);
+  color_cloud_msg.header.frame_id="/camera_init";
+  color_cloud_msg.header.stamp=ros::Time::now();
+  _pubRGBMap.publish(color_cloud_msg);
+
+  if(!flatCloud)
+  {
+    std::cout<<"flat cloud is empty"<<std::endl;
+    return ;
+  }
+  std::cout<<"publish map time:"<<(ros::Time::now()-start).toSec()*1000<<"ms"<<std::endl;
+  sensor_msgs::PointCloud2 flat_cloud_msg;
+  pcl::toROSMsg(*flatCloud,flat_cloud_msg);
+  flat_cloud_msg.header.frame_id="/camera_init";
+  flat_cloud_msg.header.stamp=ros::Time::now();
+  _pubFlatMap.publish(flat_cloud_msg);
 }
 void BackendOptimization::pubPoseGraphTochild()
 {
-  //transport pose graph to anathor machine
+  //transport pose graph to another machine
   std::vector<float> compressPose;
   compressPose.reserve(8*(_keyFrames.size()+_receivedKeyFrames.size())+2);
   compressPose.push_back(-1);
@@ -1420,15 +1429,31 @@ void BackendOptimization::pubPoseGraphTochild()
 bool BackendOptimization::save_map_cllback(loam_velodyne::SaveMapRequest& req,loam_velodyne::SaveMapResponse& res)
 {
   std::vector<KeyFrameSnapshot::Ptr> snapshot;
+   std::vector<KeyFrameSnapshot::Ptr> another_snapshot;
   _snapshot_cloud_mutex.lock();
   snapshot=_snapshot_cloud;
+  another_snapshot=_another_snapshot_cloud;
   _snapshot_cloud_mutex.unlock();
-  pcl::PointCloud<PointT>::Ptr cloud=_map_generate->generate(snapshot,req.resolution,_display_distance_threash,true);
-  if(!cloud)
+  pcl::PointCloud<PointT>::Ptr colorCloud=nullptr;
+  pcl::PointCloud<PointT>::Ptr flatCloud=nullptr;
+  if(_carId=="master")
+  {
+    colorCloud=_map_generate->generateRGBCloud(snapshot,req.resolution,_display_distance_threash,true);
+    flatCloud=_map_generate->generateFlatRGBCloud(another_snapshot,req.resolution,_display_distance_threash,true);
+  }
+  else
+  {
+    colorCloud=_map_generate->generateRGBCloud(another_snapshot,req.resolution,_display_distance_threash,true);
+    flatCloud=_map_generate->generateFlatRGBCloud(snapshot,req.resolution,_display_distance_threash,true);
+  }
+  if(!colorCloud || !flatCloud)
   {
     res.success=false;
     return true;
   }
+  pcl::PointCloud<PointT>::Ptr allCloud(new pcl::PointCloud<PointT>());
+  allCloud->reserve(flatCloud->size()+colorCloud->size());
+  *allCloud=*colorCloud+*flatCloud;
   size_t position=req.destination.find_last_of("/");
   std::string path_dir(req.destination.substr(0,position));
   boost::filesystem::path save_path(path_dir.c_str());
@@ -1437,7 +1462,7 @@ bool BackendOptimization::save_map_cllback(loam_velodyne::SaveMapRequest& req,lo
     boost::filesystem::create_directory(save_path);
   }
 
-  bool ret=pcl::io::savePCDFileBinary(req.destination,*cloud);
+  bool ret=pcl::io::savePCDFileBinary(req.destination,*allCloud);
   res.success=(ret==0);
   return true;
 }

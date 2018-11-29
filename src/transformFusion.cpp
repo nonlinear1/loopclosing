@@ -117,7 +117,6 @@ public:
       pose.rotate(eig_qua.toRotationMatrix());
       pose.pretranslate(Eigen::Vector3d(req.x,req.y,req.z));
       childToMaster=pose;
-      std::cout<<"childToMaster"<<childToMaster.matrix()<<std::endl;
       res.success=true;
       return true;
     }
